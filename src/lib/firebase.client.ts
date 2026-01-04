@@ -1,68 +1,24 @@
-import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
-import {
-  getAuth,
-  type Auth,
-  GoogleAuthProvider,
-  type AuthProvider,
-} from "firebase/auth";
-import { getFirestore, type Firestore } from "firebase/firestore";
+﻿import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
+import { getAuth, type Auth } from "firebase/auth";
+import { firebasePublicConfig } from "./firebase.config";
 
-type FirebaseClient = {
-  app: FirebaseApp;
-  auth: Auth;
-  db: Firestore;
-  googleProvider: AuthProvider;
-};
-
-function optionalEnv(name: string): string | undefined {
-  const value = process.env[name];
-  return value && value.length > 0 ? value : undefined;
+function assertConfig() {
+  const entries = Object.entries(firebasePublicConfig);
+  const missing = entries.filter(([, v]) => !v).map(([k]) => k);
+  if (missing.length) {
+    throw new Error(`[firebase] Missing env values: ${missing.join(", ")}. Check .env.local and restart dev server.`);
+  }
 }
 
-let cached: FirebaseClient | null | undefined;
-
-/**
- * Client-side Firebase accessor.
- * - Returns `null` if required env vars are missing (UI should show a friendly message).
- * - Memoized for repeated imports/calls.
- */
-export function getFirebaseClient(): FirebaseClient | null {
-  if (cached !== undefined) return cached;
-
-  const apiKey = optionalEnv("NEXT_PUBLIC_FIREBASE_API_KEY");
-  const authDomain = optionalEnv("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN");
-  const projectId = optionalEnv("NEXT_PUBLIC_FIREBASE_PROJECT_ID");
-  const storageBucket = optionalEnv("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET");
-  const messagingSenderId = optionalEnv("NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID");
-  const appId = optionalEnv("NEXT_PUBLIC_FIREBASE_APP_ID");
-
-  if (
-    !apiKey ||
-    !authDomain ||
-    !projectId ||
-    !storageBucket ||
-    !messagingSenderId ||
-    !appId
-  ) {
-    cached = null;
-    return cached;
+export function getFirebaseClient(): { app: FirebaseApp; auth: Auth } {
+  if (typeof window === "undefined") {
+    throw new Error("[firebase] getFirebaseClient() must be called in the browser (client component).");
   }
 
-  const config = {
-    apiKey,
-    authDomain,
-    projectId,
-    storageBucket,
-    messagingSenderId,
-    appId,
-  };
+  assertConfig();
 
-  const app = getApps().length ? getApps()[0]! : initializeApp(config);
+  const app = getApps().length ? getApp() : initializeApp(firebasePublicConfig);
   const auth = getAuth(app);
-  const db = getFirestore(app);
-  const googleProvider = new GoogleAuthProvider();
 
-  cached = { app, auth, db, googleProvider };
-  return cached;
+  return { app, auth };
 }
-

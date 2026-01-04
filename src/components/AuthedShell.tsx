@@ -1,102 +1,197 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { useRouter } from "next/navigation";
+import { ReactNode, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { getFirebaseClient } from "@/lib/firebase.client";
 import { textsTR } from "@/lib/texts.tr";
 
 type AuthedShellProps = {
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
 };
 
+type NavItem = { href: string; label: string };
+
 export function AuthedShell({ title, children }: AuthedShellProps) {
+  const pathname = usePathname();
   const router = useRouter();
-  const fb = getFirebaseClient();
-  const [user, setUser] = useState<User | null>(null);
-  const [busy, setBusy] = useState(false);
+  const { auth } = getFirebaseClient();
+
+  const [user, setUser] = useState<User | null>(auth.currentUser);
 
   useEffect(() => {
-    if (!fb) return;
-    const unsub = onAuthStateChanged(fb.auth, (u) => setUser(u));
+    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
     return () => unsub();
-  }, [fb]);
+  }, [auth]);
 
-  async function handleLogout() {
-    if (!fb) return;
-    setBusy(true);
-    try {
-      await signOut(fb.auth);
-      router.replace("/login");
-    } finally {
-      setBusy(false);
-    }
+  const nav = useMemo<NavItem[]>(
+    () => [
+      { href: "/dashboard", label: textsTR?.nav?.dashboard ?? "Gösterge Paneli" },
+      { href: "/profile", label: textsTR?.nav?.profile ?? "Profil" },
+      { href: "/leaderboard", label: textsTR?.nav?.leaderboard ?? "Liderlik Tablosu" },
+    ],
+    []
+  );
+
+  async function onLogout() {
+    await signOut(auth);
+    router.replace("/login");
   }
 
-  if (!fb) {
-    return (
-      <div className="mx-auto flex min-h-[50vh] w-full max-w-3xl items-center justify-center px-6">
-        <p className="text-sm text-zinc-600 dark:text-zinc-300">
-          {textsTR.errors.configMissing}
-        </p>
-      </div>
-    );
-  }
+  const displayName = user?.displayName || user?.email || "Kullanıcı";
+  const photoURL = user?.photoURL || "";
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-950 dark:bg-black dark:text-zinc-50">
-      <header className="border-b border-zinc-200 bg-white/70 backdrop-blur dark:border-zinc-800 dark:bg-black/50">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-950 text-sm font-semibold text-white dark:bg-white dark:text-black">
-              {textsTR.common.appName.slice(0, 1)}
+    <div style={{ minHeight: "100vh", background: "#000" }}>
+      <header
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 10,
+          backdropFilter: "blur(10px)",
+          background: "rgba(0,0,0,0.75)",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
+        }}
+      >
+        <div
+          style={{
+            maxWidth: 1200,
+            margin: "0 auto",
+            padding: "14px 20px",
+            display: "flex",
+            alignItems: "center",
+            gap: 18,
+          }}
+        >
+          <Link
+            href="/dashboard"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              textDecoration: "none",
+              color: "white",
+              minWidth: 180,
+            }}
+          >
+            <div
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 10,
+                background: "white",
+                color: "black",
+                display: "grid",
+                placeItems: "center",
+                fontWeight: 900,
+              }}
+            >
+              N
             </div>
-            <div className="flex flex-col leading-tight">
-              <span className="text-sm font-semibold">{textsTR.common.appName}</span>
-              <span className="text-xs text-zinc-600 dark:text-zinc-300">
-                {user?.displayName || user?.email || textsTR.common.loading}
-              </span>
+            <div style={{ lineHeight: 1.1 }}>
+              <div style={{ fontWeight: 800 }}>NoirNote</div>
+              <div style={{ fontSize: 12, opacity: 0.75 }}>5N 1Dedektif</div>
             </div>
-          </div>
+          </Link>
 
-          <nav className="flex items-center gap-2 text-sm">
-            <Link
-              href="/dashboard"
-              className="rounded-lg px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-900"
+          <nav style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+            {nav.map((item) => {
+              const active = pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  style={{
+                    textDecoration: "none",
+                    color: active ? "white" : "rgba(255,255,255,0.7)",
+                    fontWeight: 700,
+                    fontSize: 14,
+                    padding: "8px 10px",
+                    borderRadius: 10,
+                    background: active ? "rgba(255,255,255,0.08)" : "transparent",
+                  }}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+            <div
+              title={displayName}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "6px 10px",
+                borderRadius: 14,
+                border: "1px solid rgba(255,255,255,0.12)",
+                background: "rgba(255,255,255,0.05)",
+                maxWidth: 260,
+              }}
             >
-              {textsTR.nav.dashboard}
-            </Link>
-            <Link
-              href="/profile"
-              className="rounded-lg px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-900"
-            >
-              {textsTR.nav.profile}
-            </Link>
-            <Link
-              href="/leaderboard"
-              className="rounded-lg px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-900"
-            >
-              {textsTR.nav.leaderboard}
-            </Link>
+              <div
+                style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: 999,
+                  overflow: "hidden",
+                  background: "rgba(255,255,255,0.12)",
+                  display: "grid",
+                  placeItems: "center",
+                  flex: "0 0 auto",
+                }}
+              >
+                {photoURL ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={photoURL} alt="" style={{ width: "100%", height: "100%" }} />
+                ) : (
+                  <span style={{ fontSize: 12, fontWeight: 900 }}>
+                    {(displayName?.[0] || "K").toUpperCase()}
+                  </span>
+                )}
+              </div>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 800,
+                  color: "rgba(255,255,255,0.9)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {displayName}
+              </div>
+            </div>
+
             <button
               type="button"
-              onClick={handleLogout}
-              disabled={busy}
-              className="rounded-lg bg-zinc-950 px-3 py-2 text-white hover:bg-zinc-800 disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+              onClick={onLogout}
+              style={{
+                height: 36,
+                padding: "0 14px",
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,0.18)",
+                background: "rgba(255,255,255,0.06)",
+                color: "white",
+                cursor: "pointer",
+                fontWeight: 800,
+              }}
             >
-              {busy ? textsTR.common.loading : textsTR.nav.logout}
+              {textsTR?.nav?.logout ?? "Çıkış yap"}
             </button>
-          </nav>
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-5xl px-6 py-10">
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        <div className="mt-6">{children}</div>
+      <main style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 20px", color: "white" }}>
+        <h1 style={{ fontSize: 34, fontWeight: 900, margin: 0 }}>{title}</h1>
+        <div style={{ marginTop: 14 }}>{children}</div>
       </main>
     </div>
   );
 }
-

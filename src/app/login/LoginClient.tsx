@@ -1,87 +1,115 @@
-"use client";
+﻿"use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { signInWithPopup } from "firebase/auth";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  setPersistence,
+  browserLocalPersistence,
+  signInWithPopup,
+} from "firebase/auth";
 import { getFirebaseClient } from "@/lib/firebase.client";
-import { ensureUserDoc } from "@/lib/userDoc.client";
-import { textsTR } from "@/lib/texts.tr";
 
-type LoginClientProps = {
-  nextPath: string;
-};
-
-function isPopupClosedError(e: unknown): boolean {
-  const code = (e as { code?: unknown } | null)?.code;
-  return (
-    code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request"
-  );
-}
-
-export default function LoginClient({ nextPath }: LoginClientProps) {
+export default function LoginClient() {
   const router = useRouter();
-  const fb = getFirebaseClient();
+  const sp = useSearchParams();
 
+  const [mounted, setMounted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // ✅ SSR/CSR uyumu
+  useEffect(() => setMounted(true), []);
+
+  // ✅ next parametresi
+  const nextPath = sp.get("next") || "/dashboard";
+
+  // ✅ Provider tek kez oluşturulsun
+  const provider = useMemo(() => new GoogleAuthProvider(), []);
+
+  // ✅ Kullanıcı zaten girişliyse login ekranını göstermeden yönlendir
   useEffect(() => {
-    if (!fb) return;
-    const unsub = fb.auth.onAuthStateChanged((user) => {
+    if (!mounted) return;
+    const { auth } = getFirebaseClient();
+
+    const unsub = onAuthStateChanged(auth, (user) => {
       if (user) router.replace(nextPath);
     });
-    return () => unsub();
-  }, [fb, router, nextPath]);
 
-  async function handleGoogleSignIn() {
-    if (!fb) return;
-    setBusy(true);
+    return () => unsub();
+  }, [mounted, router, nextPath]);
+
+  async function onGoogleSignIn() {
     setError(null);
+    setBusy(true);
+
     try {
-      const result = await signInWithPopup(fb.auth, fb.googleProvider);
-      await ensureUserDoc(result.user);
+      const { auth } = getFirebaseClient();
+
+      // ✅ Kalıcılık: refresh olunca login düşmesin
+      await setPersistence(auth, browserLocalPersistence);
+
+      await signInWithPopup(auth, provider);
+
       router.replace(nextPath);
-    } catch (e) {
-      setError(
-        isPopupClosedError(e) ? textsTR.errors.authPopupClosed : textsTR.errors.authFailed,
-      );
+    } catch (e: any) {
+      console.error("[login] signIn error", e);
+      const msg =
+        e?.code === "auth/popup-blocked"
+          ? "Popup engellenmiş görünüyor. Tarayıcıda pop-up iznini açıp tekrar dene."
+          : e?.code === "auth/popup-closed-by-user"
+          ? "Popup kapatıldı. Tekrar deneyebilirsin."
+          : e?.message || "Giriş sırasında bir hata oluştu.";
+      setError(msg);
     } finally {
       setBusy(false);
     }
   }
 
+  if (!mounted) {
+    return (
+      <div style={{ padding: 16 }}>
+        <div style={{ height: 44, width: 260, borderRadius: 10, background: "rgba(0,0,0,0.08)" }} />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-950 dark:bg-black dark:text-zinc-50">
-      <main className="mx-auto flex w-full max-w-md flex-col gap-6 px-6 py-20">
-        <div className="rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-          <h1 className="text-2xl font-semibold tracking-tight">{textsTR.login.title}</h1>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
-            {textsTR.login.subtitle}
-          </p>
+    <div style={{ padding: 16, display: "grid", gap: 12, maxWidth: 520 }}>
+      <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Giriş</h1>
 
-          {!fb ? (
-            <p className="mt-6 text-sm text-zinc-600 dark:text-zinc-300">
-              {textsTR.errors.configMissing}
-            </p>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={handleGoogleSignIn}
-                disabled={busy}
-                className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-zinc-950 px-5 py-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
-              >
-                {busy ? textsTR.login.signingIn : textsTR.login.googleButton}
-              </button>
+      <button
+        type="button"
+        onClick={onGoogleSignIn}
+        disabled={busy}
+        style={{
+          height: 44,
+          borderRadius: 10,
+          border: "1px solid rgba(0,0,0,0.15)",
+          background: "white",
+          cursor: busy ? "not-allowed" : "pointer",
+          fontWeight: 600,
+          opacity: busy ? 0.7 : 1,
+        }}
+      >
+        {busy ? "Açılıyor..." : "Google ile giriş yap"}
+      </button>
 
-              {error ? (
-                <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>
-              ) : null}
-            </>
-          )}
+      {error && (
+        <div
+          role="alert"
+          style={{
+            padding: 12,
+            borderRadius: 10,
+            background: "rgba(255,0,0,0.08)",
+            border: "1px solid rgba(255,0,0,0.2)",
+            fontSize: 14,
+          }}
+        >
+          {error}
         </div>
-      </main>
+      )}
     </div>
   );
 }
-

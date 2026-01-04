@@ -1,4 +1,4 @@
-import { AuthGate } from "@/components/AuthGate";
+﻿import AuthGate from "@/components/AuthGate";
 import { AuthedShell } from "@/components/AuthedShell";
 import { textsTR } from "@/lib/texts.tr";
 
@@ -13,4 +13,3 @@ export default function LeaderboardPage() {
     </AuthGate>
   );
 }
-
