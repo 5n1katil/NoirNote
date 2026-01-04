@@ -5,6 +5,7 @@ import { AuthedShell } from "@/components/AuthedShell";
 import { textsTR } from "@/lib/texts.tr";
 import { getCaseById } from "@/lib/cases";
 import { getText } from "@/lib/text-resolver";
+import CaseClient from "./CaseClient";
 
 type CasePageProps = {
   params: Promise<{ caseId: string }>;
@@ -22,7 +23,7 @@ export default async function CasePage({ params }: CasePageProps) {
     <AuthGate>
       <AuthedShell title={getText(caseData.titleKey)}>
         <div className="space-y-6">
-          {/* Vaka başlığı */}
+          {/* Header with back button and difficulty */}
           <div>
             <div className="flex items-center gap-3 mb-4">
               <Link
@@ -42,29 +43,8 @@ export default async function CasePage({ params }: CasePageProps) {
             </div>
           </div>
 
-          {/* İpuçları */}
-          <div>
-            <h2 className="text-lg font-semibold text-white mb-4">
-              {textsTR.cases.clues}
-            </h2>
-            <ul className="space-y-3">
-              {caseData.clues.map((clueKey, index) => (
-                <li
-                  key={index}
-                  className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 text-sm text-zinc-300"
-                >
-                  {getText(clueKey)}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Placeholder: Oyun tahtası */}
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-8 text-center">
-            <p className="text-zinc-400">
-              {textsTR.cases.boardPlaceholder}
-            </p>
-          </div>
+          {/* Case content (client component for grid interactions) */}
+          <CaseClient caseData={caseData} />
         </div>
       </AuthedShell>
     </AuthGate>

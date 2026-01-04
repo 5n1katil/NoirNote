@@ -7,30 +7,34 @@
 export type Suspect = {
   id: string;
   nameKey: string;
+  iconKey: string; // Text key for icon/emoji
 };
 
 export type Location = {
   id: string;
   nameKey: string;
+  iconKey: string; // Text key for icon/emoji
 };
 
-export type Item = {
+export type Weapon = {
   id: string;
   nameKey: string;
+  iconKey: string; // Text key for icon/emoji
 };
 
 export type Case = {
   id: string;
   titleKey: string;
   difficulty: "easy" | "medium" | "hard";
+  briefingKey: string; // Text key for case briefing
   suspects: Suspect[];
   locations: Location[];
-  items: Item[];
+  weapons: Weapon[];
   clues: string[]; // Text keys
   solution: {
     suspectId: string;
     locationId: string;
-    itemId: string;
+    weaponId: string;
   };
 };
 
