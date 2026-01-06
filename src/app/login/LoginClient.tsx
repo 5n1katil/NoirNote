@@ -22,6 +22,19 @@ export default function LoginClient() {
   // ✅ SSR/CSR uyumu
   useEffect(() => setMounted(true), []);
 
+  // 🔍 Debug: Log Firebase env vars and host on mount (client-side only)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "";
+      console.log("[debug] Firebase Config (on mount):", {
+        host: window.location.host,
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+        NEXT_PUBLIC_FIREBASE_API_KEY: apiKey ? `${apiKey.substring(0, 6)}...` : "undefined",
+      });
+    }
+  }, []);
+
   // ✅ next parametresi
   const nextPath = sp.get("next") || "/dashboard";
 
@@ -41,6 +54,15 @@ export default function LoginClient() {
   }, [mounted, router, nextPath]);
 
   async function onGoogleSignIn() {
+    // 🔍 Debug: Log Firebase env vars before sign-in
+    const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "";
+    console.log("[debug] Firebase Config (before sign-in):", {
+      host: window.location.host,
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+      NEXT_PUBLIC_FIREBASE_API_KEY: apiKey ? `${apiKey.substring(0, 6)}...` : "undefined",
+    });
+
     setError(null);
     setBusy(true);
 
