@@ -41,29 +41,54 @@ function formatDate(timestamp: number): string {
 }
 
 export default function ProfileClient() {
-  const [user, setUser] = useState<User | null>(null);
+  // Get user immediately from auth.currentUser (optimistic)
+  const { auth } = getFirebaseClient();
+  const [user, setUser] = useState<User | null>(auth.currentUser);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [caseResults, setCaseResults] = useState<CaseResultWithDetails[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [resultsLoading, setResultsLoading] = useState(true);
 
   useEffect(() => {
     const { auth, db } = getFirebaseClient();
-
+    
     let unsubscribeStats: (() => void) | null = null;
     let unsubscribeResults: (() => void) | null = null;
     let unsubscribeAuth: (() => void) | null = null;
-    let statsLoaded = false;
-    let resultsLoaded = false;
 
-    function checkAndSetLoading() {
-      if (statsLoaded && resultsLoaded) {
-        setLoading(false);
-      }
+    // Get user immediately (from auth.currentUser if available)
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      setUser(currentUser);
+      setupListeners(currentUser);
+    } else {
+      // Only wait for auth if not immediately available (should be rare)
+      unsubscribeAuth = onAuthStateChanged(auth, (user: User | null) => {
+        setUser(user);
+
+        // Cleanup previous listeners
+        if (unsubscribeStats) {
+          unsubscribeStats();
+          unsubscribeStats = null;
+        }
+        if (unsubscribeResults) {
+          unsubscribeResults();
+          unsubscribeResults = null;
+        }
+
+        if (!user) {
+          setStatsLoading(false);
+          setResultsLoading(false);
+          return;
+        }
+
+        setupListeners(user);
+      });
     }
 
     function setupListeners(currentUser: User) {
       try {
-        // Load user stats (real-time listener)
+        // Load user stats (real-time listener) - parallel
         const statsRef = doc(db, "users", currentUser.uid, "stats", "main");
         unsubscribeStats = onSnapshot(
           statsRef,
@@ -73,19 +98,16 @@ export default function ProfileClient() {
             } else {
               setStats(null);
             }
-            statsLoaded = true;
-            checkAndSetLoading();
+            setStatsLoading(false);
           },
           (error) => {
             console.error("[ProfileClient] Stats listener error:", error);
             setStats(null);
-            statsLoaded = true;
-            checkAndSetLoading();
+            setStatsLoading(false);
           }
         );
 
-        // Load case results (only wins) - real-time listener
-        // Use query without orderBy to avoid index requirement (sort client-side)
+        // Load case results (only wins) - parallel with stats
         const resultsRef = collection(db, "results");
         const q = query(
           resultsRef,
@@ -107,55 +129,21 @@ export default function ProfileClient() {
             // Sort by finishedAt descending (most recent first)
             results.sort((a, b) => b.finishedAt - a.finishedAt);
             setCaseResults(results);
-            resultsLoaded = true;
-            checkAndSetLoading();
+            setResultsLoading(false);
           },
           (error) => {
             console.error("[ProfileClient] Results listener error:", error);
             setCaseResults([]);
-            resultsLoaded = true;
-            checkAndSetLoading();
+            setResultsLoading(false);
           }
         );
       } catch (error) {
         console.error("[ProfileClient] Failed to setup listeners:", error);
         setStats(null);
         setCaseResults([]);
-        statsLoaded = true;
-        resultsLoaded = true;
-        checkAndSetLoading();
+        setStatsLoading(false);
+        setResultsLoading(false);
       }
-    }
-
-    // Check current user immediately (faster path)
-    const currentUser = auth.currentUser;
-    if (currentUser) {
-      setUser(currentUser);
-      setupListeners(currentUser);
-    } else {
-      // Wait for auth state if not ready
-      unsubscribeAuth = onAuthStateChanged(auth, (user: User | null) => {
-        setUser(user);
-
-        // Cleanup previous listeners
-        if (unsubscribeStats) {
-          unsubscribeStats();
-          unsubscribeStats = null;
-        }
-        if (unsubscribeResults) {
-          unsubscribeResults();
-          unsubscribeResults = null;
-        }
-        statsLoaded = false;
-        resultsLoaded = false;
-
-        if (!user) {
-          setLoading(false);
-          return;
-        }
-
-        setupListeners(user);
-      });
     }
 
     // Cleanup function
@@ -166,18 +154,12 @@ export default function ProfileClient() {
     };
   }, []);
 
-  if (loading) {
+  // Show page immediately if user is available (optimistic rendering)
+  // Don't wait for stats/results - show them as they load
+  if (!user) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-zinc-400">{textsTR.common.loading}</div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="text-center py-12">
-        <div className="text-zinc-400">Kullanıcı bulunamadı</div>
       </div>
     );
   }
@@ -209,7 +191,11 @@ export default function ProfileClient() {
           <span className="text-2xl">📊</span>
           {textsTR.profile.stats}
         </h2>
-        {stats ? (
+        {statsLoading ? (
+          <div className="text-center py-8 text-zinc-400">
+            <div className="inline-block animate-pulse">{textsTR.common.loading}</div>
+          </div>
+        ) : stats ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="rounded-lg border border-zinc-800 bg-zinc-950/50 p-4">
               <div className="text-xs text-zinc-500 mb-1">{textsTR.profile.totalScore}</div>
@@ -241,7 +227,11 @@ export default function ProfileClient() {
           <span className="text-2xl">🏆</span>
           {textsTR.profile.caseResults}
         </h2>
-        {caseResults.length > 0 ? (
+        {resultsLoading ? (
+          <div className="text-center py-8 text-zinc-400">
+            <div className="inline-block animate-pulse">{textsTR.common.loading}</div>
+          </div>
+        ) : caseResults.length > 0 ? (
           <div className="space-y-3">
             {caseResults.map((result) => (
               <div
