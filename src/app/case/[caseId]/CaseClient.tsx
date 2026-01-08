@@ -215,9 +215,14 @@ export default function CaseClient({ caseData }: CaseClientProps) {
         activeCase.penaltyMs,
         newAttempts,
         score
-      ).catch((error) => {
-        console.error("[CaseClient] Failed to process case completion:", error);
-      });
+      )
+        .then(() => {
+          console.log("[CaseClient] Case completion processed successfully");
+        })
+        .catch((error) => {
+          console.error("[CaseClient] Failed to process case completion:", error);
+          // Don't show error to user, but log it for debugging
+        });
     } else {
       // Wrong solution - apply penalty
       newPenaltyMs = activeCase.penaltyMs + PENALTY_MS;

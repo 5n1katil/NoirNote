@@ -225,33 +225,76 @@ async function processWithUser(
 ): Promise<void> {
   const { updateUserStats } = await import("./userStats.client");
   
-  // Update user stats
-  await updateUserStats(user.uid, score, durationMs, attempts);
-
-  // Get updated stats for leaderboard
-  const stats = await getUserStats(user.uid);
-  if (!stats) {
-    throw new Error("Failed to get user stats after update");
-  }
-
-  // Update global leaderboard
-  await updateGlobalLeaderboard(
-    user.uid,
-    user.displayName || user.email || "Kullanıcı",
-    user.photoURL,
-    stats.totalScore,
-    stats.solvedCases
-  );
-
-  // Update case-specific leaderboard
-  await updateCaseLeaderboard(
-    user.uid,
-    user.displayName || user.email || "Kullanıcı",
-    user.photoURL,
+  console.log("[leaderboard] Processing case completion:", {
     caseId,
     score,
     durationMs,
-    attempts
-  );
+    attempts,
+    uid: user.uid,
+  });
+  
+  // Update user stats
+  try {
+    await updateUserStats(user.uid, score, durationMs, attempts);
+    console.log("[leaderboard] User stats updated successfully");
+  } catch (error) {
+    console.error("[leaderboard] Failed to update user stats:", error);
+    throw error;
+  }
+
+  // Get updated stats for leaderboard (with retry logic)
+  let stats = await getUserStats(user.uid);
+  if (!stats) {
+    // Retry after a short delay (stats might not be immediately available due to eventual consistency)
+    console.log("[leaderboard] Stats not found immediately, retrying...");
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    stats = await getUserStats(user.uid);
+    if (!stats) {
+      // Retry one more time with longer delay
+      console.warn("[leaderboard] Stats still null after first retry, retrying again...");
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      stats = await getUserStats(user.uid);
+      if (!stats) {
+        console.error("[leaderboard] Failed to get user stats after multiple retries");
+        throw new Error("Failed to get user stats after update and retries");
+      }
+    }
+  }
+  
+  console.log("[leaderboard] Got user stats:", stats);
+
+  // Update global leaderboard
+  try {
+    await updateGlobalLeaderboard(
+      user.uid,
+      user.displayName || user.email || "Kullanıcı",
+      user.photoURL,
+      stats.totalScore,
+      stats.solvedCases
+    );
+    console.log("[leaderboard] Global leaderboard updated successfully");
+  } catch (error) {
+    console.error("[leaderboard] Failed to update global leaderboard:", error);
+    throw error;
+  }
+
+  // Update case-specific leaderboard
+  try {
+    await updateCaseLeaderboard(
+      user.uid,
+      user.displayName || user.email || "Kullanıcı",
+      user.photoURL,
+      caseId,
+      score,
+      durationMs,
+      attempts
+    );
+    console.log("[leaderboard] Case-specific leaderboard updated successfully");
+  } catch (error) {
+    console.error("[leaderboard] Failed to update case-specific leaderboard:", error);
+    throw error;
+  }
+  
+  console.log("[leaderboard] Case completion processing finished successfully");
 }
 

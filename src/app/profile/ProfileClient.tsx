@@ -85,12 +85,12 @@ export default function ProfileClient() {
         );
 
         // Load case results (only wins) - real-time listener
+        // Use query without orderBy to avoid index requirement (sort client-side)
         const resultsRef = collection(db, "results");
         const q = query(
           resultsRef,
           where("uid", "==", currentUser.uid),
-          where("isWin", "==", true),
-          orderBy("finishedAt", "desc")
+          where("isWin", "==", true)
         );
         unsubscribeResults = onSnapshot(
           q,
@@ -104,52 +104,17 @@ export default function ProfileClient() {
                 caseTitle: caseData ? getText(caseData.titleKey) : data.caseId,
               });
             });
+            // Sort by finishedAt descending (most recent first)
+            results.sort((a, b) => b.finishedAt - a.finishedAt);
             setCaseResults(results);
             resultsLoaded = true;
             checkAndSetLoading();
           },
           (error) => {
             console.error("[ProfileClient] Results listener error:", error);
-            // Check if it's a missing index error
-            if (error.code === "failed-precondition") {
-              console.warn("[ProfileClient] Firestore index missing. Attempting query without orderBy...");
-              // Retry without orderBy as fallback
-              const qFallback = query(
-                resultsRef,
-                where("uid", "==", currentUser.uid),
-                where("isWin", "==", true)
-              );
-              const unsubscribeFallback = onSnapshot(
-                qFallback,
-                (snapshot) => {
-                  const results: CaseResultWithDetails[] = [];
-                  snapshot.forEach((docSnap) => {
-                    const data = docSnap.data() as CaseResult;
-                    const caseData = getCaseById(data.caseId);
-                    results.push({
-                      ...data,
-                      caseTitle: caseData ? getText(caseData.titleKey) : data.caseId,
-                    });
-                  });
-                  // Sort manually
-                  results.sort((a, b) => b.finishedAt - a.finishedAt);
-                  setCaseResults(results);
-                  resultsLoaded = true;
-                  checkAndSetLoading();
-                },
-                (fallbackError) => {
-                  console.error("[ProfileClient] Fallback query also failed:", fallbackError);
-                  setCaseResults([]);
-                  resultsLoaded = true;
-                  checkAndSetLoading();
-                }
-              );
-              unsubscribeResults = unsubscribeFallback;
-            } else {
-              setCaseResults([]);
-              resultsLoaded = true;
-              checkAndSetLoading();
-            }
+            setCaseResults([]);
+            resultsLoaded = true;
+            checkAndSetLoading();
           }
         );
       } catch (error) {
