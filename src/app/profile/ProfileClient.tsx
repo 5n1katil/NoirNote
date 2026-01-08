@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { collection, query, where, getDocs, orderBy, onSnapshot, doc } from "firebase/firestore";
+import { collection, query, where, getDocs, onSnapshot, doc, getDoc, limit } from "firebase/firestore";
 import { getFirebaseClient } from "@/lib/firebase.client";
 import { getUserStats, type UserStats } from "@/lib/userStats.client";
 import { getCaseById } from "@/lib/cases";
@@ -86,10 +86,27 @@ export default function ProfileClient() {
       });
     }
 
-    function setupListeners(currentUser: User) {
+    async function setupListeners(currentUser: User) {
       try {
-        // Load user stats (real-time listener) - parallel
+        // Strategy: Load data immediately with getDoc/getDocs (fast), then setup real-time listeners
+        
+        // 1. Load stats immediately (one-time read - much faster than onSnapshot for initial load)
         const statsRef = doc(db, "users", currentUser.uid, "stats", "main");
+        try {
+          const statsSnap = await getDoc(statsRef);
+          if (statsSnap.exists()) {
+            setStats(statsSnap.data() as UserStats);
+          } else {
+            setStats(null);
+          }
+          setStatsLoading(false);
+        } catch (error) {
+          console.error("[ProfileClient] Failed to load stats:", error);
+          setStats(null);
+          setStatsLoading(false);
+        }
+
+        // Setup real-time listener for stats updates (background)
         unsubscribeStats = onSnapshot(
           statsRef,
           (snap) => {
@@ -98,22 +115,42 @@ export default function ProfileClient() {
             } else {
               setStats(null);
             }
-            setStatsLoading(false);
           },
           (error) => {
             console.error("[ProfileClient] Stats listener error:", error);
-            setStats(null);
-            setStatsLoading(false);
           }
         );
 
-        // Load case results (only wins) - parallel with stats
+        // 2. Load case results immediately (one-time read - much faster)
         const resultsRef = collection(db, "results");
         const q = query(
           resultsRef,
           where("uid", "==", currentUser.uid),
-          where("isWin", "==", true)
+          where("isWin", "==", true),
+          limit(50) // Limit to 50 most recent results for faster loading
         );
+        try {
+          const resultsSnapshot = await getDocs(q);
+          const results: CaseResultWithDetails[] = [];
+          resultsSnapshot.forEach((docSnap) => {
+            const data = docSnap.data() as CaseResult;
+            const caseData = getCaseById(data.caseId);
+            results.push({
+              ...data,
+              caseTitle: caseData ? getText(caseData.titleKey) : data.caseId,
+            });
+          });
+          // Sort by finishedAt descending (most recent first)
+          results.sort((a, b) => b.finishedAt - a.finishedAt);
+          setCaseResults(results);
+          setResultsLoading(false);
+        } catch (error) {
+          console.error("[ProfileClient] Failed to load results:", error);
+          setCaseResults([]);
+          setResultsLoading(false);
+        }
+
+        // Setup real-time listener for results updates (background)
         unsubscribeResults = onSnapshot(
           q,
           (snapshot) => {
@@ -129,12 +166,9 @@ export default function ProfileClient() {
             // Sort by finishedAt descending (most recent first)
             results.sort((a, b) => b.finishedAt - a.finishedAt);
             setCaseResults(results);
-            setResultsLoading(false);
           },
           (error) => {
             console.error("[ProfileClient] Results listener error:", error);
-            setCaseResults([]);
-            setResultsLoading(false);
           }
         );
       } catch (error) {
