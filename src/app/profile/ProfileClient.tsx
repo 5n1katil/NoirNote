@@ -51,19 +51,17 @@ export default function ProfileClient() {
 
     let unsubscribeStats: (() => void) | null = null;
     let unsubscribeResults: (() => void) | null = null;
+    let unsubscribeAuth: (() => void) | null = null;
+    let statsLoaded = false;
+    let resultsLoaded = false;
 
-    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser: User | null) => {
-      setUser(currentUser);
-
-      // Cleanup previous listeners
-      if (unsubscribeStats) unsubscribeStats();
-      if (unsubscribeResults) unsubscribeResults();
-
-      if (!currentUser) {
+    function checkAndSetLoading() {
+      if (statsLoaded && resultsLoaded) {
         setLoading(false);
-        return;
       }
+    }
 
+    function setupListeners(currentUser: User) {
       try {
         // Load user stats (real-time listener)
         const statsRef = doc(db, "users", currentUser.uid, "stats", "main");
@@ -75,11 +73,14 @@ export default function ProfileClient() {
             } else {
               setStats(null);
             }
-            setLoading(false);
+            statsLoaded = true;
+            checkAndSetLoading();
           },
           (error) => {
             console.error("[ProfileClient] Stats listener error:", error);
-            setLoading(false);
+            setStats(null);
+            statsLoaded = true;
+            checkAndSetLoading();
           }
         );
 
@@ -104,21 +105,97 @@ export default function ProfileClient() {
               });
             });
             setCaseResults(results);
-            setLoading(false);
+            resultsLoaded = true;
+            checkAndSetLoading();
           },
           (error) => {
             console.error("[ProfileClient] Results listener error:", error);
-            setLoading(false);
+            // Check if it's a missing index error
+            if (error.code === "failed-precondition") {
+              console.warn("[ProfileClient] Firestore index missing. Attempting query without orderBy...");
+              // Retry without orderBy as fallback
+              const qFallback = query(
+                resultsRef,
+                where("uid", "==", currentUser.uid),
+                where("isWin", "==", true)
+              );
+              const unsubscribeFallback = onSnapshot(
+                qFallback,
+                (snapshot) => {
+                  const results: CaseResultWithDetails[] = [];
+                  snapshot.forEach((docSnap) => {
+                    const data = docSnap.data() as CaseResult;
+                    const caseData = getCaseById(data.caseId);
+                    results.push({
+                      ...data,
+                      caseTitle: caseData ? getText(caseData.titleKey) : data.caseId,
+                    });
+                  });
+                  // Sort manually
+                  results.sort((a, b) => b.finishedAt - a.finishedAt);
+                  setCaseResults(results);
+                  resultsLoaded = true;
+                  checkAndSetLoading();
+                },
+                (fallbackError) => {
+                  console.error("[ProfileClient] Fallback query also failed:", fallbackError);
+                  setCaseResults([]);
+                  resultsLoaded = true;
+                  checkAndSetLoading();
+                }
+              );
+              unsubscribeResults = unsubscribeFallback;
+            } else {
+              setCaseResults([]);
+              resultsLoaded = true;
+              checkAndSetLoading();
+            }
           }
         );
       } catch (error) {
         console.error("[ProfileClient] Failed to setup listeners:", error);
-        setLoading(false);
+        setStats(null);
+        setCaseResults([]);
+        statsLoaded = true;
+        resultsLoaded = true;
+        checkAndSetLoading();
       }
-    });
+    }
 
+    // Check current user immediately (faster path)
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      setUser(currentUser);
+      setupListeners(currentUser);
+    } else {
+      // Wait for auth state if not ready
+      unsubscribeAuth = onAuthStateChanged(auth, (user: User | null) => {
+        setUser(user);
+
+        // Cleanup previous listeners
+        if (unsubscribeStats) {
+          unsubscribeStats();
+          unsubscribeStats = null;
+        }
+        if (unsubscribeResults) {
+          unsubscribeResults();
+          unsubscribeResults = null;
+        }
+        statsLoaded = false;
+        resultsLoaded = false;
+
+        if (!user) {
+          setLoading(false);
+          return;
+        }
+
+        setupListeners(user);
+      });
+    }
+
+    // Cleanup function
     return () => {
-      unsubscribeAuth();
+      if (unsubscribeAuth) unsubscribeAuth();
       if (unsubscribeStats) unsubscribeStats();
       if (unsubscribeResults) unsubscribeResults();
     };
