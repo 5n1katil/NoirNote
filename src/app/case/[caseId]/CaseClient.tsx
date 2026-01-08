@@ -67,25 +67,40 @@ export default function CaseClient({ caseData }: CaseClientProps) {
         if (loaded && loaded.status === "playing") {
           setActiveCase(loaded);
           setGridState(loaded.gridState);
+          setIsLoading(false);
         } else {
           // Initialize new active case
           const initialized = await initializeActiveCase(caseData.id, getInitialGridState());
-          setActiveCase(initialized);
+          if (mounted) {
+            setActiveCase(initialized);
+            setIsLoading(false);
+          }
         }
       } catch (error) {
         console.error("[CaseClient] Failed to load active case:", error);
-        // Initialize on error
+        // Initialize on error (fallback)
         try {
           const initialized = await initializeActiveCase(caseData.id, getInitialGridState());
           if (mounted) {
             setActiveCase(initialized);
+            setIsLoading(false);
           }
         } catch (initError) {
           console.error("[CaseClient] Failed to initialize active case:", initError);
-        }
-      } finally {
-        if (mounted) {
-          setIsLoading(false);
+          // Even if initialization fails, show UI with default state
+          if (mounted) {
+            const fallbackCase: ActiveCase = {
+              caseId: caseData.id,
+              status: "playing",
+              startedAt: Date.now(),
+              attempts: 0,
+              penaltyMs: 0,
+              gridState: getInitialGridState(),
+              updatedAt: null,
+            };
+            setActiveCase(fallbackCase);
+            setIsLoading(false);
+          }
         }
       }
     }
@@ -115,10 +130,24 @@ export default function CaseClient({ caseData }: CaseClientProps) {
     return () => clearTimeout(timeoutId);
   }, [gridState, activeCase, isLoading]);
 
-  // Timer calculation (duration + penalty)
-  const currentDuration = activeCase
-    ? Math.floor((Date.now() - activeCase.startedAt + activeCase.penaltyMs) / 1000)
-    : 0;
+  // Timer calculation (duration + penalty) - update every second
+  const [currentDuration, setCurrentDuration] = useState(0);
+
+  useEffect(() => {
+    if (!activeCase || isLoading) {
+      setCurrentDuration(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setCurrentDuration(Math.floor((Date.now() - activeCase.startedAt + activeCase.penaltyMs) / 1000));
+    }, 1000);
+
+    // Set initial value immediately
+    setCurrentDuration(Math.floor((Date.now() - activeCase.startedAt + activeCase.penaltyMs) / 1000));
+
+    return () => clearInterval(interval);
+  }, [activeCase, isLoading]);
 
   // Handle grid state changes from InvestigationGrid
   const handleGridStateChange = useCallback((newState: GridState) => {

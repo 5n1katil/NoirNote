@@ -23,10 +23,39 @@ export type ActiveCase = {
  * Get active case for current user
  */
 export async function getActiveCase(caseId: string): Promise<ActiveCase | null> {
+  const { auth, db } = getFirebaseClient();
+
+  // Check if user is already authenticated (faster path)
+  if (auth.currentUser) {
+    try {
+      const ref = doc(db, "users", auth.currentUser.uid, "activeCase", caseId);
+      const snap = await getDoc(ref);
+
+      if (snap.exists()) {
+        return snap.data() as ActiveCase;
+      }
+      return null;
+    } catch (error) {
+      console.error("[activeCase] Failed to get active case:", error);
+      throw error;
+    }
+  }
+
+  // Wait for auth state if not ready yet
   return new Promise((resolve, reject) => {
-    const { auth, db } = getFirebaseClient();
+    let resolved = false;
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        unsubscribe();
+        reject(new Error("[activeCase] Auth state timeout"));
+      }
+    }, 5000); // 5 second timeout
 
     const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timeout);
       unsubscribe();
 
       if (!user) {
@@ -55,10 +84,42 @@ export async function getActiveCase(caseId: string): Promise<ActiveCase | null> 
  * Initialize or update active case
  */
 export async function saveActiveCase(activeCase: Omit<ActiveCase, "updatedAt">): Promise<void> {
+  const { auth, db } = getFirebaseClient();
+
+  // Check if user is already authenticated (faster path)
+  if (auth.currentUser) {
+    try {
+      const ref = doc(db, "users", auth.currentUser.uid, "activeCase", activeCase.caseId);
+      await setDoc(
+        ref,
+        {
+          ...activeCase,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+      return;
+    } catch (error) {
+      console.error("[activeCase] Failed to save active case:", error);
+      throw error;
+    }
+  }
+
+  // Wait for auth state if not ready yet
   return new Promise((resolve, reject) => {
-    const { auth, db } = getFirebaseClient();
+    let resolved = false;
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        unsubscribe();
+        reject(new Error("[activeCase] Auth state timeout"));
+      }
+    }, 5000); // 5 second timeout
 
     const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timeout);
       unsubscribe();
 
       if (!user) {

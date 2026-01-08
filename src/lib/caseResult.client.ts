@@ -30,12 +30,49 @@ export async function saveCaseResult(
   attempts: number,
   isWin: boolean
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const { auth, db } = getFirebaseClient();
+  const { auth, db } = getFirebaseClient();
 
-    // Wait for auth state to ensure we have a user
+  // Check if user is already authenticated (faster path)
+  if (auth.currentUser) {
+    try {
+      const docId = `${auth.currentUser.uid}_${caseId}`;
+      const ref = doc(db, "results", docId);
+
+      const data: CaseResult = {
+        uid: auth.currentUser.uid,
+        caseId,
+        finishedAt: Date.now(),
+        durationMs,
+        penaltyMs,
+        attempts,
+        isWin,
+        createdAt: serverTimestamp(),
+      };
+
+      await setDoc(ref, data, { merge: true });
+      return;
+    } catch (error) {
+      console.error("[caseResult] Failed to save result:", error);
+      throw error;
+    }
+  }
+
+  // Wait for auth state if not ready yet
+  return new Promise((resolve, reject) => {
+    let resolved = false;
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        unsubscribe();
+        reject(new Error("[caseResult] Auth state timeout"));
+      }
+    }, 5000); // 5 second timeout
+
     const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
-      unsubscribe(); // Clean up listener
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timeout);
+      unsubscribe();
 
       if (!user) {
         reject(new Error("[caseResult] User not authenticated"));
