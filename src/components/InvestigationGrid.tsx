@@ -7,7 +7,7 @@
  * Handles localStorage persistence and entity info cards.
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import type { Case } from "@/types/game";
 import type { GridState, GridCellState } from "@/types/grid";
 import { textsTR } from "@/lib/texts.tr";
@@ -16,22 +16,25 @@ import LNotebookGrid from "./LNotebookGrid";
 
 type InvestigationGridProps = {
   caseData: Case;
+  gridState: GridState;
+  onGridStateChange: (newState: GridState) => void;
 };
 
 type EntityInfoCardProps = {
   name: string;
   icon: string;
+  bio?: string;
   onClose: () => void;
 };
 
-function EntityInfoCard({ name, icon, onClose }: EntityInfoCardProps) {
+function EntityInfoCard({ name, icon, bio, onClose }: EntityInfoCardProps) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="relative mx-4 w-full max-w-sm rounded-xl border border-zinc-800 bg-zinc-900 p-6 shadow-xl"
+        className="relative mx-4 w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-900 p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -42,8 +45,10 @@ function EntityInfoCard({ name, icon, onClose }: EntityInfoCardProps) {
         </button>
         <div className="text-center">
           <div className="text-4xl mb-3">{icon}</div>
-          <h3 className="text-xl font-semibold text-white mb-2">{name}</h3>
-          <p className="text-sm text-zinc-400">{textsTR.common.about}</p>
+          <h3 className="text-xl font-semibold text-white mb-3">{name}</h3>
+          {bio && (
+            <p className="text-sm text-zinc-300 leading-relaxed px-2">{bio}</p>
+          )}
         </div>
       </div>
     </div>
@@ -66,111 +71,59 @@ function nextCycle(current: GridCellState): GridCellState {
   }
 }
 
-export default function InvestigationGrid({ caseData }: InvestigationGridProps) {
-  // Initial empty state
-  const getInitialState = (): GridState => {
-    const emptyGrid: GridCellState[][] = [
-      ["empty", "empty", "empty"],
-      ["empty", "empty", "empty"],
-      ["empty", "empty", "empty"],
-    ];
-    return {
-      SL: emptyGrid,
-      SW: emptyGrid,
-      LW: emptyGrid,
-    };
-  };
-
-  const [gridState, setGridState] = useState<GridState>(() => getInitialState());
+export default function InvestigationGrid({ 
+  caseData, 
+  gridState, 
+  onGridStateChange 
+}: InvestigationGridProps) {
   const [infoCard, setInfoCard] = useState<{
     name: string;
     icon: string;
+    bio?: string;
   } | null>(null);
-
-  // Load from localStorage on mount
-  useEffect(() => {
-    const storageKey = `noirnote:grid:${caseData.id}`;
-    try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Validate structure
-        if (
-          parsed.SL &&
-          parsed.SW &&
-          parsed.LW &&
-          Array.isArray(parsed.SL) &&
-          Array.isArray(parsed.SW) &&
-          Array.isArray(parsed.LW)
-        ) {
-          setGridState(parsed as GridState);
-        } else {
-          localStorage.removeItem(storageKey);
-        }
-      }
-    } catch (e) {
-      console.error("Failed to load grid state", e);
-      localStorage.removeItem(storageKey);
-    }
-  }, [caseData.id]);
-
-  // Save to localStorage whenever gridState changes
-  useEffect(() => {
-    const storageKey = `noirnote:grid:${caseData.id}`;
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(gridState));
-    } catch (e) {
-      console.error("Failed to save grid state", e);
-    }
-  }, [gridState, caseData.id]);
 
   // Handle cell click
   const handleCellClick = useCallback(
     (section: "SW" | "SL" | "LW", row: number, col: number) => {
-      setGridState((prev) => {
-        const grid = [...prev[section]];
-        const rowCopy = [...grid[row]];
-        const currentState = rowCopy[col] as GridCellState;
+      const grid = [...gridState[section]];
+      const rowCopy = [...grid[row]];
+      const currentState = rowCopy[col] as GridCellState;
 
-        // Simply cycle to next state - each cell is independent
-        const nextState = nextCycle(currentState);
-        rowCopy[col] = nextState;
+      // Cycle to next state
+      const nextState = nextCycle(currentState);
+      rowCopy[col] = nextState;
 
-        grid[row] = rowCopy;
-        const newState = { ...prev, [section]: grid };
+      grid[row] = rowCopy;
+      const newState = { ...gridState, [section]: grid };
 
-        // Debug logging
-        const finalState = newState[section][row][col];
-        console.log("[CELL CLICK]", {
-          section,
-          row,
-          col,
-          prev: currentState,
-          next: finalState,
-        });
-
-        return newState;
-      });
+      // Notify parent of state change
+      onGridStateChange(newState);
     },
-    []
+    [gridState, onGridStateChange]
   );
 
   // Handle header click (show info card)
   const handleHeaderClick = useCallback(
     (type: "suspect" | "weapon" | "location", id: string) => {
       let entity;
+      let bioKey: string | undefined;
+
       if (type === "suspect") {
         entity = caseData.suspects.find((s) => s.id === id);
+        bioKey = entity?.bioKey;
       } else if (type === "weapon") {
         entity = caseData.weapons.find((w) => w.id === id);
+        bioKey = entity?.descriptionKey;
       } else {
         entity = caseData.locations.find((l) => l.id === id);
+        bioKey = entity?.descriptionKey;
       }
 
       if (entity) {
         setInfoCard({
           name: getText(entity.nameKey),
           icon: getText(entity.iconKey),
+          bio: bioKey ? getText(bioKey) : undefined,
         });
       }
     },
@@ -202,6 +155,7 @@ export default function InvestigationGrid({ caseData }: InvestigationGridProps) 
         <EntityInfoCard
           name={infoCard.name}
           icon={infoCard.icon}
+          bio={infoCard.bio}
           onClose={() => setInfoCard(null)}
         />
       )}

@@ -2,15 +2,18 @@
 
 /**
  * Client wrapper for case page - handles InvestigationGrid and FinalDeduction
+ * Firestore-based state management
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type { Case } from "@/types/game";
+import type { GridState } from "@/types/grid";
 import { textsTR } from "@/lib/texts.tr";
 import { getText } from "@/lib/text-resolver";
 import InvestigationGrid from "@/components/InvestigationGrid";
 import ResultModal from "./ResultModal";
 import { saveCaseResult } from "@/lib/caseResult.client";
+import { getActiveCase, saveActiveCase, initializeActiveCase, type ActiveCase } from "@/lib/activeCase.client";
 
 type CaseClientProps = {
   caseData: Case;
@@ -20,51 +23,111 @@ type ResultState = {
   type: "success" | "failure";
   duration: number;
   attempts: number;
+  penaltyMs: number;
 } | null;
+
+const PENALTY_MS = 5 * 60 * 1000; // 5 minutes per wrong attempt
+
+function getInitialGridState(): GridState {
+  const emptyGrid: GridState["SL"] = [
+    ["empty", "empty", "empty"],
+    ["empty", "empty", "empty"],
+    ["empty", "empty", "empty"],
+  ];
+  return {
+    SL: emptyGrid,
+    SW: emptyGrid,
+    LW: emptyGrid,
+  };
+}
 
 export default function CaseClient({ caseData }: CaseClientProps) {
   const [finalSuspect, setFinalSuspect] = useState<string>("");
   const [finalLocation, setFinalLocation] = useState<string>("");
   const [finalWeapon, setFinalWeapon] = useState<string>("");
-  const [duration, setDuration] = useState<number>(0);
-  const [attempts, setAttempts] = useState<number>(0);
-  const [isTimerRunning, setIsTimerRunning] = useState<boolean>(true);
+  const [activeCase, setActiveCase] = useState<ActiveCase | null>(null);
+  const [gridState, setGridState] = useState<GridState>(getInitialGridState());
   const [resultState, setResultState] = useState<ResultState>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const allSelected = finalSuspect && finalLocation && finalWeapon;
   const isModalOpen = resultState !== null;
 
-  // Timer tracking
+  // Load active case from Firestore
   useEffect(() => {
-    const startTimeKey = `noirnote:start:${caseData.id}`;
-    const stored = localStorage.getItem(startTimeKey);
-    const startTime = stored ? parseInt(stored, 10) : Date.now();
-    
-    if (!stored) {
-      localStorage.setItem(startTimeKey, startTime.toString());
+    let mounted = true;
+
+    async function loadActiveCase() {
+      try {
+        const loaded = await getActiveCase(caseData.id);
+        
+        if (!mounted) return;
+
+        if (loaded && loaded.status === "playing") {
+          setActiveCase(loaded);
+          setGridState(loaded.gridState);
+        } else {
+          // Initialize new active case
+          const initialized = await initializeActiveCase(caseData.id, getInitialGridState());
+          setActiveCase(initialized);
+        }
+      } catch (error) {
+        console.error("[CaseClient] Failed to load active case:", error);
+        // Initialize on error
+        try {
+          const initialized = await initializeActiveCase(caseData.id, getInitialGridState());
+          if (mounted) {
+            setActiveCase(initialized);
+          }
+        } catch (initError) {
+          console.error("[CaseClient] Failed to initialize active case:", initError);
+        }
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
     }
 
-    if (!isTimerRunning) return;
+    loadActiveCase();
 
-    const interval = setInterval(() => {
-      setDuration(Math.floor((Date.now() - startTime) / 1000));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [caseData.id, isTimerRunning]);
-
-  // Attempts tracking
-  useEffect(() => {
-    const attemptsKey = `noirnote:attempts:${caseData.id}`;
-    const stored = localStorage.getItem(attemptsKey);
-    const initialAttempts = stored ? parseInt(stored, 10) : 0;
-    setAttempts(initialAttempts);
+    return () => {
+      mounted = false;
+    };
   }, [caseData.id]);
 
+  // Debounced save grid state to Firestore
+  useEffect(() => {
+    if (!activeCase || isLoading) return;
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        await saveActiveCase({
+          ...activeCase,
+          gridState,
+        });
+      } catch (error) {
+        console.error("[CaseClient] Failed to save grid state:", error);
+      }
+    }, 1000); // 1 second debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [gridState, activeCase, isLoading]);
+
+  // Timer calculation (duration + penalty)
+  const currentDuration = activeCase
+    ? Math.floor((Date.now() - activeCase.startedAt + activeCase.penaltyMs) / 1000)
+    : 0;
+
+  // Handle grid state changes from InvestigationGrid
+  const handleGridStateChange = useCallback((newState: GridState) => {
+    setGridState(newState);
+  }, []);
+
   // Submit handler
-  function onSubmitReport() {
-    if (!allSelected || isSubmitting || isModalOpen) return;
+  async function onSubmitReport() {
+    if (!allSelected || isSubmitting || isModalOpen || !activeCase) return;
 
     setIsSubmitting(true);
 
@@ -74,39 +137,69 @@ export default function CaseClient({ caseData }: CaseClientProps) {
       finalLocation === caseData.solution.locationId &&
       finalWeapon === caseData.solution.weaponId;
 
-    // Increment attempts
-    const newAttempts = attempts + 1;
-    const attemptsKey = `noirnote:attempts:${caseData.id}`;
-    localStorage.setItem(attemptsKey, newAttempts.toString());
-    setAttempts(newAttempts);
+    const newAttempts = activeCase.attempts + 1;
+    let newPenaltyMs = activeCase.penaltyMs;
+    let newStatus: "playing" | "finished" = activeCase.status;
 
-    // Stop timer if correct
     if (isCorrect) {
-      setIsTimerRunning(false);
+      // Correct solution
+      newStatus = "finished";
+      const durationMs = Date.now() - activeCase.startedAt + activeCase.penaltyMs;
+
+      // Save result
+      saveCaseResult(caseData.id, durationMs, activeCase.penaltyMs, newAttempts, true).catch((error) => {
+        console.error("[CaseClient] Failed to save result:", error);
+      });
+
+      // Update active case
+      await saveActiveCase({
+        ...activeCase,
+        status: newStatus,
+        attempts: newAttempts,
+        gridState,
+      });
+
+      setResultState({
+        type: "success",
+        duration: Math.floor(durationMs / 1000),
+        attempts: newAttempts,
+        penaltyMs: activeCase.penaltyMs,
+      });
+    } else {
+      // Wrong solution - apply penalty
+      newPenaltyMs = activeCase.penaltyMs + PENALTY_MS;
+
+      // Update active case with penalty
+      const updated = {
+        ...activeCase,
+        attempts: newAttempts,
+        penaltyMs: newPenaltyMs,
+        gridState,
+      };
+
+      await saveActiveCase(updated);
+      setActiveCase(updated);
+
+      // Save result (wrong attempt)
+      const durationMs = Date.now() - activeCase.startedAt + newPenaltyMs;
+      saveCaseResult(caseData.id, durationMs, newPenaltyMs, newAttempts, false).catch((error) => {
+        console.error("[CaseClient] Failed to save result:", error);
+      });
+
+      setResultState({
+        type: "failure",
+        duration: Math.floor(durationMs / 1000),
+        attempts: newAttempts,
+        penaltyMs: newPenaltyMs,
+      });
     }
 
-    // Save to Firestore (don't block on this - fire and forget)
-    saveCaseResult(caseData.id, duration, newAttempts, isCorrect).catch((error) => {
-      console.error("[CaseClient] Failed to save result:", error);
-      // Continue even if save fails
-    });
-
-    // Show result modal immediately (non-blocking)
-    setResultState({
-      type: isCorrect ? "success" : "failure",
-      duration,
-      attempts: newAttempts,
-    });
-
-    // Reset submitting state after a short delay to ensure modal renders
-    setTimeout(() => {
-      setIsSubmitting(false);
-    }, 100);
+    setIsSubmitting(false);
   }
 
   function closeResultModal() {
     setResultState(null);
-    // If incorrect, allow retry (don't reset form)
+    // If incorrect, allow retry
     // If correct, form should remain disabled
   }
 
@@ -119,6 +212,14 @@ export default function CaseClient({ caseData }: CaseClientProps) {
     return `${secs}sn`;
   }
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-zinc-400">{textsTR.common.loading}</div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className={`space-y-8 ${isModalOpen ? "pointer-events-none opacity-50" : ""}`}>
@@ -127,12 +228,20 @@ export default function CaseClient({ caseData }: CaseClientProps) {
           <div className="flex items-center gap-4">
             <div className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-4 py-2">
               <span className="text-xs text-zinc-400 mr-2">⏱️ Süre:</span>
-              <span className="text-sm font-semibold text-white">{formatDuration(duration)}</span>
+              <span className="text-sm font-semibold text-white">{formatDuration(currentDuration)}</span>
             </div>
             <div className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-4 py-2">
               <span className="text-xs text-zinc-400 mr-2">🎯 Denemeler:</span>
-              <span className="text-sm font-semibold text-white">{attempts}</span>
+              <span className="text-sm font-semibold text-white">{activeCase?.attempts || 0}</span>
             </div>
+            {activeCase && activeCase.penaltyMs > 0 && (
+              <div className="rounded-lg border border-red-800/50 bg-red-950/20 px-4 py-2">
+                <span className="text-xs text-red-400 mr-2">⚠️ Ceza:</span>
+                <span className="text-sm font-semibold text-red-400">
+                  +{Math.floor(activeCase.penaltyMs / 1000 / 60)}dk
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -178,7 +287,11 @@ export default function CaseClient({ caseData }: CaseClientProps) {
           {/* Right Column: Investigation Grid */}
           <div className="lg:sticky lg:top-24 lg:self-start">
             <div className="rounded-xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 p-6 shadow-lg shadow-black/20">
-              <InvestigationGrid caseData={caseData} />
+              <InvestigationGrid 
+                caseData={caseData} 
+                gridState={gridState}
+                onGridStateChange={handleGridStateChange}
+              />
             </div>
           </div>
         </div>
@@ -200,7 +313,7 @@ export default function CaseClient({ caseData }: CaseClientProps) {
             <select
               value={finalSuspect}
               onChange={(e) => setFinalSuspect(e.target.value)}
-              disabled={isModalOpen || isSubmitting}
+              disabled={isModalOpen || isSubmitting || activeCase?.status === "finished"}
               className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-zinc-700 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">-- Seçiniz --</option>
@@ -221,7 +334,7 @@ export default function CaseClient({ caseData }: CaseClientProps) {
             <select
               value={finalLocation}
               onChange={(e) => setFinalLocation(e.target.value)}
-              disabled={isModalOpen || isSubmitting}
+              disabled={isModalOpen || isSubmitting || activeCase?.status === "finished"}
               className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-zinc-700 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">-- Seçiniz --</option>
@@ -242,7 +355,7 @@ export default function CaseClient({ caseData }: CaseClientProps) {
             <select
               value={finalWeapon}
               onChange={(e) => setFinalWeapon(e.target.value)}
-              disabled={isModalOpen || isSubmitting}
+              disabled={isModalOpen || isSubmitting || activeCase?.status === "finished"}
               className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-zinc-700 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">-- Seçiniz --</option>
@@ -258,15 +371,17 @@ export default function CaseClient({ caseData }: CaseClientProps) {
         {/* Submit Button */}
         <button
           onClick={onSubmitReport}
-          disabled={!allSelected || isSubmitting || isModalOpen}
+          disabled={!allSelected || isSubmitting || isModalOpen || activeCase?.status === "finished"}
           className={`w-full rounded-lg px-6 py-4 font-bold text-base transition-all duration-200 shadow-lg ${
-            allSelected && !isSubmitting && !isModalOpen
+            allSelected && !isSubmitting && !isModalOpen && activeCase?.status !== "finished"
               ? "bg-white text-black hover:bg-zinc-200 hover:shadow-xl hover:shadow-white/10 active:scale-[0.98]"
               : "bg-zinc-800 text-zinc-500 cursor-not-allowed shadow-black/20"
           }`}
           title={!allSelected ? textsTR.grid.submitDisabledHint : ""}
         >
-          {isSubmitting ? (
+          {activeCase?.status === "finished" ? (
+            "Vaka Tamamlandı ✓"
+          ) : isSubmitting ? (
             textsTR.common.loading
           ) : allSelected ? (
             <span className="flex items-center justify-center gap-2">
@@ -292,4 +407,3 @@ export default function CaseClient({ caseData }: CaseClientProps) {
     </>
   );
 }
-

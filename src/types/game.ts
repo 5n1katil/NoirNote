@@ -8,18 +8,21 @@ export type Suspect = {
   id: string;
   nameKey: string;
   iconKey: string; // Text key for icon/emoji
+  bioKey?: string; // Text key for biography/background
 };
 
 export type Location = {
   id: string;
   nameKey: string;
   iconKey: string; // Text key for icon/emoji
+  descriptionKey?: string; // Text key for location description
 };
 
 export type Weapon = {
   id: string;
   nameKey: string;
   iconKey: string; // Text key for icon/emoji
+  descriptionKey?: string; // Text key for weapon/tool description
 };
 
 export type Case = {

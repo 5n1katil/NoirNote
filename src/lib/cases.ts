@@ -5,41 +5,10 @@
  */
 
 import type { Case } from "@/types/game";
+import { case001 } from "./cases/case-001";
 
 export const cases: Case[] = [
-  {
-    id: "case-001",
-    titleKey: "cases.case001.title",
-    difficulty: "easy",
-    briefingKey: "cases.case001.briefing",
-    suspects: [
-      { id: "suspect-001", nameKey: "suspects.suspect001", iconKey: "suspects.icon001" },
-      { id: "suspect-002", nameKey: "suspects.suspect002", iconKey: "suspects.icon002" },
-      { id: "suspect-003", nameKey: "suspects.suspect003", iconKey: "suspects.icon003" },
-    ],
-    locations: [
-      { id: "location-001", nameKey: "locations.location001", iconKey: "locations.icon001" },
-      { id: "location-002", nameKey: "locations.location002", iconKey: "locations.icon002" },
-      { id: "location-003", nameKey: "locations.location003", iconKey: "locations.icon003" },
-    ],
-    weapons: [
-      { id: "weapon-001", nameKey: "weapons.weapon001", iconKey: "weapons.icon001" },
-      { id: "weapon-002", nameKey: "weapons.weapon002", iconKey: "weapons.icon002" },
-      { id: "weapon-003", nameKey: "weapons.weapon003", iconKey: "weapons.icon003" },
-    ],
-    clues: [
-      "cases.case001.clues.clue1",
-      "cases.case001.clues.clue2",
-      "cases.case001.clues.clue3",
-      "cases.case001.clues.clue4",
-      "cases.case001.clues.clue5",
-    ],
-    solution: {
-      suspectId: "suspect-001",
-      locationId: "location-002",
-      weaponId: "weapon-003",
-    },
-  },
+  case001,
   {
     id: "case-002",
     titleKey: "cases.case002.title",

@@ -9,24 +9,26 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { getFirebaseClient } from "@/lib/firebase.client";
 
 export type CaseResult = {
-  userId: string;
+  uid: string;
   caseId: string;
-  durationSeconds: number;
+  finishedAt: number; // Timestamp (milliseconds)
+  durationMs: number; // Total duration including penalties
+  penaltyMs: number; // Total penalty time in milliseconds
   attempts: number;
-  completedAt: number; // Timestamp
-  isCorrect: boolean;
+  isWin: boolean; // true if correct solution
   createdAt: unknown; // serverTimestamp placeholder
 };
 
 /**
  * Save case result to Firestore
- * Document ID format: {userId}_{caseId}
+ * Document ID format: {uid}_{caseId}
  */
 export async function saveCaseResult(
   caseId: string,
-  durationSeconds: number,
+  durationMs: number,
+  penaltyMs: number,
   attempts: number,
-  isCorrect: boolean
+  isWin: boolean
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const { auth, db } = getFirebaseClient();
@@ -45,12 +47,13 @@ export async function saveCaseResult(
         const ref = doc(db, "results", docId);
 
         const data: CaseResult = {
-          userId: user.uid,
+          uid: user.uid,
           caseId,
-          durationSeconds,
+          finishedAt: Date.now(),
+          durationMs,
+          penaltyMs,
           attempts,
-          completedAt: Date.now(),
-          isCorrect,
+          isWin,
           createdAt: serverTimestamp(),
         };
 
