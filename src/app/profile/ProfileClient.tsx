@@ -17,6 +17,7 @@ import {
   doc, 
   getDoc, 
   limit,
+  orderBy,
   getDocFromCache,
   getDocsFromCache,
   enableNetwork,
@@ -108,11 +109,12 @@ export default function ProfileClient() {
         
         const statsRef = doc(db, "users", currentUser.uid, "stats", "main");
         const resultsRef = collection(db, "results");
+        // Show all attempts (both wins and losses) for complete game history
+        // Note: orderBy removed to avoid index requirement, we sort client-side instead
         const resultsQuery = query(
           resultsRef,
           where("uid", "==", currentUser.uid),
-          where("isWin", "==", true),
-          limit(50) // Limit to 50 most recent results for faster loading
+          limit(100) // Limit to 100 most recent results for faster loading (will be sorted by finishedAt client-side)
         );
 
         // Helper functions for loading and processing data
@@ -196,7 +198,7 @@ export default function ProfileClient() {
                     caseTitle: caseData ? getText(caseData.titleKey) : data.caseId,
                   });
                 });
-                // Sort by finishedAt descending (most recent first)
+                // Sort by finishedAt descending (most recent first) - client-side sorting
                 results.sort((a, b) => b.finishedAt - a.finishedAt);
                 return results;
               } catch (networkError: any) {
@@ -361,20 +363,36 @@ export default function ProfileClient() {
           </div>
         ) : caseResults.length > 0 ? (
           <div className="space-y-3">
-            {caseResults.map((result) => (
+            {caseResults.map((result, index) => (
               <div
-                key={`${result.uid}_${result.caseId}`}
-                className="rounded-lg border border-zinc-800 bg-zinc-950/50 p-4 hover:border-zinc-700 transition-colors"
+                key={`${result.uid}_${result.caseId}_${result.finishedAt}_${index}`}
+                className={`rounded-lg border p-4 hover:border-zinc-700 transition-colors ${
+                  result.isWin 
+                    ? "border-zinc-800 bg-zinc-950/50" 
+                    : "border-zinc-800/50 bg-zinc-950/30 opacity-75"
+                }`}
               >
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+                <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center">
                   <div>
                     <div className="text-xs text-zinc-500 mb-1">{textsTR.profile.case}</div>
                     <div className="font-semibold text-white">{result.caseTitle}</div>
                   </div>
-                  {result.score !== undefined && (
+                  <div>
+                    <div className="text-xs text-zinc-500 mb-1">Durum</div>
+                    <div className={`font-semibold ${result.isWin ? "text-green-400" : "text-red-400"}`}>
+                      {result.isWin ? "✓ Başarılı" : "✗ Başarısız"}
+                    </div>
+                  </div>
+                  {result.isWin && result.score !== undefined && (
                     <div>
                       <div className="text-xs text-zinc-500 mb-1">{textsTR.profile.score}</div>
                       <div className="font-semibold text-yellow-400">{result.score.toLocaleString("tr-TR")}</div>
+                    </div>
+                  )}
+                  {!result.isWin && (
+                    <div>
+                      <div className="text-xs text-zinc-500 mb-1">{textsTR.profile.score}</div>
+                      <div className="font-semibold text-zinc-500">-</div>
                     </div>
                   )}
                   <div>

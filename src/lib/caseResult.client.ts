@@ -4,7 +4,7 @@
  * Client-side utility for saving case completion results to Firestore.
  */
 
-import { doc, setDoc, serverTimestamp, waitForPendingWrites } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, waitForPendingWrites } from "firebase/firestore";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { getFirebaseClient } from "@/lib/firebase.client";
 
@@ -22,7 +22,8 @@ export type CaseResult = {
 
 /**
  * Save case result to Firestore
- * Document ID format: {uid}_{caseId}
+ * Each attempt is saved as a separate document with auto-generated ID
+ * This allows all attempts to be tracked in the history
  */
 export async function saveCaseResult(
   caseId: string,
@@ -37,10 +38,11 @@ export async function saveCaseResult(
   // Check if user is already authenticated (faster path)
   if (auth.currentUser) {
     try {
-      const docId = `${auth.currentUser.uid}_${caseId}`;
-      const ref = doc(db, "results", docId);
+      // Use collection().add() to create a new document with auto-generated ID
+      // This ensures each attempt is saved as a separate document
+      const resultsRef = collection(db, "results");
 
-      const data: CaseResult = {
+      const data: Omit<CaseResult, "createdAt"> = {
         uid: auth.currentUser.uid,
         caseId,
         finishedAt: Date.now(),
@@ -49,12 +51,14 @@ export async function saveCaseResult(
         attempts,
         isWin,
         score: isWin ? score : undefined,
-        createdAt: serverTimestamp(),
       };
 
-      // With Firestore persistence enabled, setDoc will queue writes offline
+      // With Firestore persistence enabled, addDoc will queue writes offline
       // and automatically sync when network is available
-      await setDoc(ref, data, { merge: true });
+      await addDoc(resultsRef, {
+        ...data,
+        createdAt: serverTimestamp(),
+      });
       
       // Try to wait for write to complete (works online)
       // Offline writes are automatically queued by Firestore SDK
@@ -105,10 +109,11 @@ export async function saveCaseResult(
       }
 
       try {
-        const docId = `${user.uid}_${caseId}`;
-        const ref = doc(db, "results", docId);
+        // Use collection().add() to create a new document with auto-generated ID
+        // This ensures each attempt is saved as a separate document
+        const resultsRef = collection(db, "results");
 
-        const data: CaseResult = {
+        const data: Omit<CaseResult, "createdAt"> = {
           uid: user.uid,
           caseId,
           finishedAt: Date.now(),
@@ -117,12 +122,14 @@ export async function saveCaseResult(
           attempts,
           isWin,
           score: isWin ? score : undefined,
-          createdAt: serverTimestamp(),
         };
 
-        // With Firestore persistence enabled, setDoc will queue writes offline
+        // With Firestore persistence enabled, addDoc will queue writes offline
         // and automatically sync when network is available
-        await setDoc(ref, data, { merge: true });
+        await addDoc(resultsRef, {
+          ...data,
+          createdAt: serverTimestamp(),
+        });
         
         // Try to wait for write to complete (works online)
         // Offline writes are automatically queued by Firestore SDK
