@@ -24,7 +24,7 @@ import {
 } from "firebase/firestore";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { getFirebaseClient } from "@/lib/firebase.client";
-import { getUserStats } from "./userStats.client";
+import { getUserStats, type UserStats } from "./userStats.client";
 
 export type LeaderboardEntry = {
   uid: string;
@@ -304,52 +304,73 @@ async function processWithUser(
     uid: user.uid,
   });
   
-  // Update user stats (offline-friendly - Firestore persistence will queue if offline)
-  try {
-    await updateUserStats(user.uid, score, durationMs, attempts);
-    console.log("[leaderboard] User stats updated successfully");
-  } catch (error: any) {
-    // Offline errors are expected and handled by Firestore persistence
-    if (error?.code === "unavailable" || error?.message?.includes("offline")) {
-      console.log("[leaderboard] User stats update queued offline, will sync when online");
-      // Continue processing - stats will sync when online
-      // But we need stats for leaderboard, so retry after a delay
-      console.warn("[leaderboard] Stats update queued offline, will retry...");
-      // Don't throw - allow leaderboard update to proceed (with cached/previous stats if available)
-    } else {
-      console.error("[leaderboard] Failed to update user stats:", error);
-      throw error;
+  // CRITICAL: Update user stats only on first attempt (attempts === 1)
+  // Subsequent attempts should not affect the detective score (top stats)
+  // They are only recorded in case history for viewing
+  let stats: UserStats | null = null;
+  
+  if (attempts === 1) {
+    // First attempt: Update stats with this case's score
+    console.log("[leaderboard] First attempt - updating user stats with score:", score);
+    try {
+      await updateUserStats(user.uid, score, durationMs, attempts);
+      console.log("[leaderboard] User stats updated successfully (first attempt)");
+    } catch (error: any) {
+      // Offline errors are expected and handled by Firestore persistence
+      if (error?.code === "unavailable" || error?.message?.includes("offline")) {
+        console.log("[leaderboard] User stats update queued offline, will sync when online");
+        // Continue processing - stats will sync when online
+      } else {
+        console.error("[leaderboard] Failed to update user stats:", error);
+        throw error;
+      }
     }
-  }
 
-  // Get updated stats for leaderboard (with retry logic and offline handling)
-  let stats = await getUserStats(user.uid);
-  if (!stats) {
-    // Retry after a short delay (stats might not be immediately available due to eventual consistency or offline)
-    console.log("[leaderboard] Stats not found immediately, retrying...");
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    // Get updated stats for leaderboard (with retry logic and offline handling)
     stats = await getUserStats(user.uid);
     if (!stats) {
-      // Retry one more time with longer delay
-      console.warn("[leaderboard] Stats still null after first retry, retrying again...");
+      // Retry after a short delay (stats might not be immediately available due to eventual consistency or offline)
+      console.log("[leaderboard] Stats not found immediately, retrying...");
       await new Promise((resolve) => setTimeout(resolve, 1000));
       stats = await getUserStats(user.uid);
       if (!stats) {
-        // If still null after retries, might be offline - use minimal stats for leaderboard
-        // or skip global leaderboard update (case-specific can still work)
-        console.warn("[leaderboard] Failed to get user stats after multiple retries (might be offline)");
-        // Create minimal stats object for leaderboard update
-        // This ensures leaderboard update can proceed even if stats read fails
-        stats = {
-          uid: user.uid,
-          totalScore: score, // Use current case score as fallback
-          solvedCases: 1, // Assume this is first case (will be corrected on next sync)
-          averageTimeMs: durationMs,
-          totalAttempts: attempts,
-          lastUpdated: Date.now(),
-        };
-        console.log("[leaderboard] Using fallback stats for offline mode:", stats);
+        // Retry one more time with longer delay
+        console.warn("[leaderboard] Stats still null after first retry, retrying again...");
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        stats = await getUserStats(user.uid);
+        if (!stats) {
+          // If still null after retries, might be offline - use minimal stats for leaderboard
+          console.warn("[leaderboard] Failed to get user stats after multiple retries (might be offline)");
+          // Create minimal stats object for leaderboard update
+          stats = {
+            uid: user.uid,
+            totalScore: score, // Use current case score as fallback
+            solvedCases: 1, // Assume this is first case (will be corrected on next sync)
+            averageTimeMs: durationMs,
+            totalAttempts: attempts,
+            lastUpdated: Date.now(),
+          };
+          console.log("[leaderboard] Using fallback stats for offline mode:", stats);
+        }
       }
+    }
+  } else {
+    // Subsequent attempts: Don't update stats, use existing stats for global leaderboard
+    // The stats should already be updated from the first attempt
+    console.log("[leaderboard] Subsequent attempt (attempts:", attempts, ") - skipping stats update, using existing stats");
+    stats = await getUserStats(user.uid);
+    if (!stats) {
+      // If stats don't exist, this shouldn't happen (first attempt should have created them)
+      // But handle gracefully with fallback
+      console.warn("[leaderboard] Stats not found for subsequent attempt, using fallback");
+      stats = {
+        uid: user.uid,
+        totalScore: 0, // Fallback - should have been set on first attempt
+        solvedCases: 0,
+        averageTimeMs: 0,
+        totalAttempts: attempts,
+        lastUpdated: Date.now(),
+      };
     }
   }
   

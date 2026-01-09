@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { collection, query, orderBy, limit, onSnapshot } from "firebase/firestore";
+import { collection, query, orderBy, limit, onSnapshot, getDocs, getDocsFromCache } from "firebase/firestore";
 import { getFirebaseClient } from "@/lib/firebase.client";
 import { cases } from "@/lib/cases";
 import { getText } from "@/lib/text-resolver";
@@ -29,12 +29,67 @@ export default function LeaderboardClient() {
   const [caseEntries, setCaseEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Load global leaderboard on mount (real-time)
+  // Load global leaderboard on mount (cache-first, then real-time)
   useEffect(() => {
     const { db } = getFirebaseClient();
     const ref = collection(db, "leaderboard", "global", "entries");
     const q = query(ref, orderBy("score", "desc"), limit(100));
 
+    // Strategy: Load from cache first (instant), then setup real-time listener
+    async function loadInitialData() {
+      try {
+        // Try cache first (instant if available, works offline)
+        try {
+          const cacheSnapshot = await getDocsFromCache(q);
+          const entries: LeaderboardEntry[] = [];
+          let index = 0;
+          cacheSnapshot.forEach((doc) => {
+            entries.push({ ...doc.data(), rank: index + 1 } as LeaderboardEntry);
+            index++;
+          });
+          setGlobalEntries(entries);
+          if (selectedCaseId === "global") {
+            setLoading(false);
+          }
+          console.log("[LeaderboardClient] Global leaderboard loaded from cache:", entries.length, "entries");
+        } catch (cacheError: any) {
+          // Cache miss or offline, try network if online
+          if (cacheError?.code === "unavailable" || cacheError?.message?.includes("offline")) {
+            console.warn("[LeaderboardClient] Offline mode: cache miss for global leaderboard");
+            // Will load from network when snapshot listener connects
+          } else {
+            // Try network (if online)
+            try {
+              const networkSnapshot = await getDocs(q);
+              const entries: LeaderboardEntry[] = [];
+              let index = 0;
+              networkSnapshot.forEach((doc) => {
+                entries.push({ ...doc.data(), rank: index + 1 } as LeaderboardEntry);
+                index++;
+              });
+              setGlobalEntries(entries);
+              if (selectedCaseId === "global") {
+                setLoading(false);
+              }
+              console.log("[LeaderboardClient] Global leaderboard loaded from network:", entries.length, "entries");
+            } catch (networkError: any) {
+              // Network error (offline), will load when snapshot listener connects
+              if (networkError?.code === "unavailable" || networkError?.message?.includes("offline")) {
+                console.warn("[LeaderboardClient] Offline mode: cannot load global leaderboard from network");
+              } else {
+                console.error("[LeaderboardClient] Failed to load global leaderboard:", networkError);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error("[LeaderboardClient] Failed to load initial global leaderboard:", error);
+      }
+    }
+
+    loadInitialData();
+
+    // Setup real-time listener for updates (background)
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
@@ -58,7 +113,7 @@ export default function LeaderboardClient() {
     return () => unsubscribe();
   }, [selectedCaseId]);
 
-  // Load case-specific leaderboard when case changes (real-time)
+  // Load case-specific leaderboard when case changes (cache-first, then real-time)
   useEffect(() => {
     if (selectedCaseId === "global") {
       setCaseEntries([]);
@@ -71,6 +126,57 @@ export default function LeaderboardClient() {
     const ref = collection(db, "leaderboard", selectedCaseId, "entries");
     const q = query(ref, orderBy("score", "desc"), limit(100));
 
+    // Strategy: Load from cache first (instant), then setup real-time listener
+    async function loadInitialData() {
+      try {
+        // Try cache first (instant if available, works offline)
+        try {
+          const cacheSnapshot = await getDocsFromCache(q);
+          const entries: LeaderboardEntry[] = [];
+          let index = 0;
+          cacheSnapshot.forEach((doc) => {
+            entries.push({ ...doc.data(), rank: index + 1 } as LeaderboardEntry);
+            index++;
+          });
+          setCaseEntries(entries);
+          setLoading(false);
+          console.log("[LeaderboardClient] Case leaderboard loaded from cache:", entries.length, "entries for", selectedCaseId);
+        } catch (cacheError: any) {
+          // Cache miss or offline, try network if online
+          if (cacheError?.code === "unavailable" || cacheError?.message?.includes("offline")) {
+            console.warn("[LeaderboardClient] Offline mode: cache miss for case leaderboard:", selectedCaseId);
+            // Will load from network when snapshot listener connects
+          } else {
+            // Try network (if online)
+            try {
+              const networkSnapshot = await getDocs(q);
+              const entries: LeaderboardEntry[] = [];
+              let index = 0;
+              networkSnapshot.forEach((doc) => {
+                entries.push({ ...doc.data(), rank: index + 1 } as LeaderboardEntry);
+                index++;
+              });
+              setCaseEntries(entries);
+              setLoading(false);
+              console.log("[LeaderboardClient] Case leaderboard loaded from network:", entries.length, "entries for", selectedCaseId);
+            } catch (networkError: any) {
+              // Network error (offline), will load when snapshot listener connects
+              if (networkError?.code === "unavailable" || networkError?.message?.includes("offline")) {
+                console.warn("[LeaderboardClient] Offline mode: cannot load case leaderboard from network:", selectedCaseId);
+              } else {
+                console.error("[LeaderboardClient] Failed to load case leaderboard:", networkError);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error("[LeaderboardClient] Failed to load initial case leaderboard:", error);
+      }
+    }
+
+    loadInitialData();
+
+    // Setup real-time listener for updates (background)
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
