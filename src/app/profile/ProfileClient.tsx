@@ -88,25 +88,75 @@ export default function ProfileClient() {
 
     async function setupListeners(currentUser: User) {
       try {
-        // Strategy: Load data immediately with getDoc/getDocs (fast), then setup real-time listeners
+        // Strategy: Load data immediately with parallel getDoc/getDocs.
+        // With Firestore persistence enabled, these queries automatically use cache
+        // if available (instant), otherwise fetch from server.
+        // Then setup real-time listeners for updates.
         
-        // 1. Load stats immediately (one-time read - much faster than onSnapshot for initial load)
         const statsRef = doc(db, "users", currentUser.uid, "stats", "main");
-        try {
-          const statsSnap = await getDoc(statsRef);
-          if (statsSnap.exists()) {
-            setStats(statsSnap.data() as UserStats);
-          } else {
-            setStats(null);
+        const resultsRef = collection(db, "results");
+        const resultsQuery = query(
+          resultsRef,
+          where("uid", "==", currentUser.uid),
+          where("isWin", "==", true),
+          limit(50) // Limit to 50 most recent results for faster loading
+        );
+
+        // Helper functions for loading and processing data
+        async function loadStats(): Promise<UserStats | null> {
+          try {
+            const statsSnap = await getDoc(statsRef);
+            // With persistence enabled, getDoc automatically uses cache if available
+            // First load: network (~100-300ms), Subsequent loads: cache (<10ms)
+            if (statsSnap.exists()) {
+              return statsSnap.data() as UserStats;
+            }
+            return null;
+          } catch (error) {
+            console.error("[ProfileClient] Failed to load stats:", error);
+            return null;
           }
-          setStatsLoading(false);
-        } catch (error) {
-          console.error("[ProfileClient] Failed to load stats:", error);
-          setStats(null);
-          setStatsLoading(false);
         }
 
-        // Setup real-time listener for stats updates (background)
+        async function loadResults(): Promise<CaseResultWithDetails[]> {
+          try {
+            const resultsSnapshot = await getDocs(resultsQuery);
+            // With persistence enabled, getDocs automatically uses cache if available
+            const results: CaseResultWithDetails[] = [];
+            resultsSnapshot.forEach((docSnap) => {
+              const data = docSnap.data() as CaseResult;
+              const caseData = getCaseById(data.caseId);
+              results.push({
+                ...data,
+                caseTitle: caseData ? getText(caseData.titleKey) : data.caseId,
+              });
+            });
+            // Sort by finishedAt descending (most recent first)
+            results.sort((a, b) => b.finishedAt - a.finishedAt);
+            return results;
+          } catch (error) {
+            console.error("[ProfileClient] Failed to load results:", error);
+            return [];
+          }
+        }
+
+        // Parallel loading: Both queries execute simultaneously
+        // Total time = max(query1, query2) instead of sum(query1 + query2)
+        // This is critical for performance - stats and results load at the same time
+        const [loadedStats, loadedResults] = await Promise.all([
+          loadStats(),
+          loadResults()
+        ]);
+
+        // Update state with loaded data
+        setStats(loadedStats);
+        setStatsLoading(false);
+        setCaseResults(loadedResults);
+        setResultsLoading(false);
+
+        // Setup real-time listeners for updates (background, non-blocking)
+        // These will sync any changes from other tabs/devices in real-time
+        // They don't block the initial render since data is already loaded above
         unsubscribeStats = onSnapshot(
           statsRef,
           (snap) => {
@@ -121,38 +171,8 @@ export default function ProfileClient() {
           }
         );
 
-        // 2. Load case results immediately (one-time read - much faster)
-        const resultsRef = collection(db, "results");
-        const q = query(
-          resultsRef,
-          where("uid", "==", currentUser.uid),
-          where("isWin", "==", true),
-          limit(50) // Limit to 50 most recent results for faster loading
-        );
-        try {
-          const resultsSnapshot = await getDocs(q);
-          const results: CaseResultWithDetails[] = [];
-          resultsSnapshot.forEach((docSnap) => {
-            const data = docSnap.data() as CaseResult;
-            const caseData = getCaseById(data.caseId);
-            results.push({
-              ...data,
-              caseTitle: caseData ? getText(caseData.titleKey) : data.caseId,
-            });
-          });
-          // Sort by finishedAt descending (most recent first)
-          results.sort((a, b) => b.finishedAt - a.finishedAt);
-          setCaseResults(results);
-          setResultsLoading(false);
-        } catch (error) {
-          console.error("[ProfileClient] Failed to load results:", error);
-          setCaseResults([]);
-          setResultsLoading(false);
-        }
-
-        // Setup real-time listener for results updates (background)
         unsubscribeResults = onSnapshot(
-          q,
+          resultsQuery,
           (snapshot) => {
             const results: CaseResultWithDetails[] = [];
             snapshot.forEach((docSnap) => {
