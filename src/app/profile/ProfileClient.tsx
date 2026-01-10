@@ -30,6 +30,8 @@ import { getCaseById } from "@/lib/cases";
 import { getText } from "@/lib/text-resolver";
 import { textsTR } from "@/lib/texts.tr";
 import type { CaseResult } from "@/lib/caseResult.client";
+import { getUserDoc, updateUserDoc } from "@/lib/userDoc.client";
+import { AVATAR_OPTIONS, getAvatarEmoji } from "@/lib/avatars";
 
 type CaseResultWithDetails = CaseResult & {
   caseTitle?: string;
@@ -59,11 +61,17 @@ export default function ProfileClient() {
   // Get user immediately from auth.currentUser (optimistic)
   const { auth } = getFirebaseClient();
   const [user, setUser] = useState<User | null>(auth.currentUser);
+  const [userDoc, setUserDoc] = useState<{ detectiveUsername: string | null; avatar: string | null } | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [caseResults, setCaseResults] = useState<CaseResultWithDetails[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
   const [resultsLoading, setResultsLoading] = useState(true);
   const [recalculating, setRecalculating] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editUsername, setEditUsername] = useState("");
+  const [editAvatar, setEditAvatar] = useState<string>(AVATAR_OPTIONS[0].id);
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   useEffect(() => {
     const { auth, db } = getFirebaseClient();
@@ -97,6 +105,17 @@ export default function ProfileClient() {
           setResultsLoading(false);
           return;
         }
+
+        // Load user document
+        getUserDoc(user.uid)
+          .then((doc) => {
+            if (doc) {
+              setUserDoc({ detectiveUsername: doc.detectiveUsername, avatar: doc.avatar });
+              setEditUsername(doc.detectiveUsername || "");
+              setEditAvatar(doc.avatar || AVATAR_OPTIONS[0].id);
+            }
+          })
+          .catch((err) => console.error("[ProfileClient] Error loading user doc:", err));
 
         setupListeners(user);
       });
@@ -348,25 +367,177 @@ export default function ProfileClient() {
     );
   }
 
+  function validateUsername(value: string): string | null {
+    if (!value.trim()) {
+      return textsTR.profile.usernameRequired;
+    }
+    if (value.length < 3) {
+      return textsTR.profile.usernameMinLength;
+    }
+    if (value.length > 20) {
+      return textsTR.profile.usernameMaxLength;
+    }
+    if (!/^[a-zA-Z0-9_çğıöşüÇĞIİÖŞÜ]+$/.test(value)) {
+      return textsTR.profile.usernameInvalid;
+    }
+    return null;
+  }
+
+  async function handleSaveProfile(e: React.FormEvent) {
+    e.preventDefault();
+    setEditError(null);
+
+    if (!user) {
+      setEditError("Kullanıcı oturumu bulunamadı.");
+      return;
+    }
+
+    const validationError = validateUsername(editUsername);
+    if (validationError) {
+      setEditError(validationError);
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      await updateUserDoc(user.uid, {
+        detectiveUsername: editUsername.trim(),
+        avatar: editAvatar,
+      });
+
+      setUserDoc({ detectiveUsername: editUsername.trim(), avatar: editAvatar });
+      setIsEditing(false);
+      setEditError(null);
+    } catch (err: any) {
+      console.error("[ProfileClient] Error saving profile:", err);
+      setEditError(err?.message || "Profil kaydedilirken bir hata oluştu.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleCancelEdit() {
+    setIsEditing(false);
+    setEditError(null);
+    setEditUsername(userDoc?.detectiveUsername || "");
+    setEditAvatar(userDoc?.avatar || AVATAR_OPTIONS[0].id);
+  }
+
+  const displayUsername = userDoc?.detectiveUsername || user?.displayName || user?.email || "Kullanıcı";
+  const displayAvatar = userDoc?.avatar;
+
   return (
     <div className="space-y-6">
       {/* User Info */}
       <div className="rounded-xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 p-6 shadow-lg shadow-black/20">
-        <div className="flex items-center gap-4 mb-6">
-          {user.photoURL && (
-            <img
-              src={user.photoURL}
-              alt={user.displayName || "Kullanıcı"}
-              className="w-16 h-16 rounded-full border-2 border-zinc-700"
-            />
-          )}
-          <div>
-            <h2 className="text-2xl font-bold text-white">
-              {user.displayName || user.email || "Kullanıcı"}
-            </h2>
-            <p className="text-sm text-zinc-400">{user.email}</p>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            {displayAvatar ? (
+              <div className="w-16 h-16 rounded-full border-2 border-zinc-700 bg-zinc-900 flex items-center justify-center text-3xl">
+                {getAvatarEmoji(displayAvatar)}
+              </div>
+            ) : user?.photoURL ? (
+              <img
+                src={user.photoURL}
+                alt={displayUsername}
+                className="w-16 h-16 rounded-full border-2 border-zinc-700"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-full border-2 border-zinc-700 bg-zinc-900 flex items-center justify-center text-3xl">
+                {displayUsername[0]?.toUpperCase() || "K"}
+              </div>
+            )}
+            <div>
+              <h2 className="text-2xl font-bold text-white">{displayUsername}</h2>
+              <p className="text-sm text-zinc-400">{user.email}</p>
+            </div>
           </div>
+          {!isEditing && (
+            <button
+              type="button"
+              onClick={() => setIsEditing(true)}
+              className="rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-900 transition-all"
+            >
+              {textsTR.profile.editProfile}
+            </button>
+          )}
         </div>
+
+        {isEditing && (
+          <form onSubmit={handleSaveProfile} className="space-y-6 border-t border-zinc-800 pt-6">
+            <div>
+              <label htmlFor="edit-username" className="block text-sm font-semibold text-zinc-300 mb-2">
+                {textsTR.profile.usernameLabel}
+              </label>
+              <input
+                id="edit-username"
+                type="text"
+                value={editUsername}
+                onChange={(e) => {
+                  setEditUsername(e.target.value);
+                  setEditError(null);
+                }}
+                placeholder={textsTR.profile.usernamePlaceholder}
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-zinc-700 transition-all"
+                maxLength={20}
+                disabled={saving}
+              />
+              <p className="mt-1 text-xs text-zinc-500">{editUsername.length}/20 karakter</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-zinc-300 mb-4">
+                {textsTR.profile.avatarLabel}
+              </label>
+              <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
+                {AVATAR_OPTIONS.map((avatar) => (
+                  <button
+                    key={avatar.id}
+                    type="button"
+                    onClick={() => setEditAvatar(avatar.id)}
+                    disabled={saving}
+                    className={`aspect-square rounded-lg border-2 transition-all ${
+                      editAvatar === avatar.id
+                        ? "border-white bg-white/10 scale-110"
+                        : "border-zinc-800 bg-zinc-950 hover:border-zinc-700 hover:bg-zinc-900"
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    title={avatar.label}
+                  >
+                    <span className="text-2xl">{avatar.emoji}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {editError && (
+              <div
+                role="alert"
+                className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400"
+              >
+                {editError}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                disabled={saving || !editUsername.trim()}
+                className="flex-1 rounded-lg bg-white text-black px-4 py-2 text-sm font-semibold hover:bg-zinc-200 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? textsTR.common.loading : textsTR.profile.saveProfile}
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                disabled={saving}
+                className="rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {textsTR.profile.cancelEdit}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
 
       {/* Stats */}

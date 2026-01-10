@@ -13,6 +13,7 @@ import { updateCaseLeaderboard } from "./leaderboard.client";
 import type { CaseResult } from "./caseResult.client";
 import { cases } from "./cases";
 import { calculateCaseScore } from "./scoring";
+import { getUserDoc } from "./userDoc.client";
 
 /**
  * Recalculate user stats from all case results
@@ -21,15 +22,28 @@ import { calculateCaseScore } from "./scoring";
 export async function recalculateUserStats(uid: string): Promise<UserStats | null> {
   const { db, auth } = getFirebaseClient();
   
-  // Get current user info
-  const currentUser = auth.currentUser;
-  if (!currentUser || currentUser.uid !== uid) {
-    console.error("[recalculateStats] User not authenticated or uid mismatch");
-    return null;
-  }
+    // Get current user info
+    const currentUser = auth.currentUser;
+    if (!currentUser || currentUser.uid !== uid) {
+      console.error("[recalculateStats] User not authenticated or uid mismatch");
+      return null;
+    }
 
-  try {
-    console.log("[recalculateStats] Starting stats recalculation for user:", uid);
+    // Get detectiveUsername and avatar from user document
+    let detectiveUsername: string;
+    let avatar: string | null;
+    try {
+      const userDoc = await getUserDoc(uid);
+      detectiveUsername = userDoc?.detectiveUsername || currentUser.displayName || currentUser.email || "Kullanıcı";
+      avatar = userDoc?.avatar || null;
+    } catch (error) {
+      console.warn("[recalculateStats] Failed to get user doc, using fallback:", error);
+      detectiveUsername = currentUser.displayName || currentUser.email || "Kullanıcı";
+      avatar = null;
+    }
+
+    try {
+      console.log("[recalculateStats] Starting stats recalculation for user:", uid);
 
     // Get all case results for this user (wins only)
     // Note: orderBy removed to avoid composite index requirement
@@ -101,8 +115,9 @@ export async function recalculateUserStats(uid: string): Promise<UserStats | nul
       try {
         await updateCaseLeaderboard(
           uid,
-          currentUser.displayName || currentUser.email || "Kullanıcı",
+          detectiveUsername, // Use detectiveUsername
           currentUser.photoURL,
+          avatar, // Pass avatar
           caseId,
           score,
           result.durationMs,
@@ -155,14 +170,14 @@ export async function recalculateUserStats(uid: string): Promise<UserStats | nul
       try {
         console.log("[recalculateStats] Updating global leaderboard with:", {
           uid,
-          displayName: currentUser.displayName || currentUser.email || "Kullanıcı",
+          displayName: detectiveUsername,
           totalScore,
           solvedCases,
           averageTimeMs,
         });
         await updateGlobalLeaderboard(
           uid,
-          currentUser.displayName || currentUser.email || "Kullanıcı",
+          detectiveUsername, // Use detectiveUsername
           currentUser.photoURL,
           totalScore,
           solvedCases,

@@ -7,6 +7,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { getFirebaseClient } from "@/lib/firebase.client";
 import { textsTR } from "@/lib/texts.tr";
+import { getUserDoc } from "@/lib/userDoc.client";
+import { getAvatarEmoji } from "@/lib/avatars";
 
 type AuthedShellProps = {
   title: string;
@@ -21,9 +23,25 @@ export function AuthedShell({ title, children }: AuthedShellProps) {
   const { auth } = getFirebaseClient();
 
   const [user, setUser] = useState<User | null>(auth.currentUser);
+  const [userDoc, setUserDoc] = useState<{ detectiveUsername: string | null; avatar: string | null } | null>(null);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      setUser(u);
+      if (u) {
+        // Load user document to get detectiveUsername and avatar
+        try {
+          const doc = await getUserDoc(u.uid);
+          if (doc) {
+            setUserDoc({ detectiveUsername: doc.detectiveUsername, avatar: doc.avatar });
+          }
+        } catch (err) {
+          console.error("[AuthedShell] Error loading user doc:", err);
+        }
+      } else {
+        setUserDoc(null);
+      }
+    });
     return () => unsub();
   }, [auth]);
 
@@ -41,7 +59,8 @@ export function AuthedShell({ title, children }: AuthedShellProps) {
     router.replace("/login");
   }
 
-  const displayName = user?.displayName || user?.email || "Kullanıcı";
+  const displayName = userDoc?.detectiveUsername || user?.displayName || user?.email || "Kullanıcı";
+  const avatar = userDoc?.avatar;
   const photoURL = user?.photoURL || "";
 
   return (
@@ -159,7 +178,9 @@ export function AuthedShell({ title, children }: AuthedShellProps) {
                   flex: "0 0 auto",
                 }}
               >
-                {photoURL ? (
+                {avatar ? (
+                  <span style={{ fontSize: 14 }}>{getAvatarEmoji(avatar)}</span>
+                ) : photoURL ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={photoURL} alt="" style={{ width: "100%", height: "100%" }} />
                 ) : (

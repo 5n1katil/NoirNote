@@ -25,10 +25,14 @@ import {
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { getFirebaseClient } from "@/lib/firebase.client";
 import { getUserStats, type UserStats } from "./userStats.client";
+import { getUserDoc } from "./userDoc.client";
+import { getAvatarEmoji } from "./avatars";
 
 export type LeaderboardEntry = {
   uid: string;
-  displayName: string;
+  displayName: string; // This will contain detectiveUsername or fallback
+  detectiveUsername?: string | null; // Store detectiveUsername separately
+  avatar?: string | null; // Store avatar separately
   photoURL?: string;
   score: number;
   durationMs?: number; // For case-specific leaderboards
@@ -40,11 +44,37 @@ export type LeaderboardEntry = {
 };
 
 /**
+ * Get display name from user document (detectiveUsername) or fallback
+ */
+async function getDisplayNameForUser(uid: string, fallback: string): Promise<string> {
+  try {
+    const userDoc = await getUserDoc(uid);
+    return userDoc?.detectiveUsername || fallback;
+  } catch (error) {
+    console.warn("[leaderboard] Failed to get user doc for display name, using fallback:", error);
+    return fallback;
+  }
+}
+
+/**
+ * Get avatar for user
+ */
+async function getAvatarForUser(uid: string): Promise<string | null> {
+  try {
+    const userDoc = await getUserDoc(uid);
+    return userDoc?.avatar || null;
+  } catch (error) {
+    console.warn("[leaderboard] Failed to get user doc for avatar:", error);
+    return null;
+  }
+}
+
+/**
  * Update global leaderboard entry for a user
  */
 export async function updateGlobalLeaderboard(
   uid: string,
-  displayName: string,
+  displayName: string, // Fallback if userDoc not found
   photoURL: string | null,
   totalScore: number,
   solvedCases: number,
@@ -53,11 +83,17 @@ export async function updateGlobalLeaderboard(
   const { db } = getFirebaseClient();
 
   try {
+    // Get detectiveUsername and avatar from user document
+    const detectiveUsername = await getDisplayNameForUser(uid, displayName);
+    const avatar = await getAvatarForUser(uid);
+    
     const ref = doc(db, "leaderboard", "global", "entries", uid);
     
     const leaderboardData: any = {
       uid,
-      displayName,
+      displayName: detectiveUsername, // Use detectiveUsername as displayName
+      detectiveUsername, // Store separately too
+      avatar, // Store avatar
       photoURL: photoURL ?? null,
       score: totalScore,
       solvedCases,
@@ -122,8 +158,9 @@ export async function updateGlobalLeaderboard(
  */
 export async function updateCaseLeaderboard(
   uid: string,
-  displayName: string,
+  displayName: string, // This should be detectiveUsername
   photoURL: string | null,
+  avatar: string | null,
   caseId: string,
   score: number,
   durationMs: number,
@@ -170,7 +207,9 @@ export async function updateCaseLeaderboard(
       ref,
       {
         uid,
-        displayName,
+        displayName, // Use detectiveUsername
+        detectiveUsername: displayName, // Store separately too
+        avatar: avatar ?? null, // Store avatar
         photoURL: photoURL ?? null,
         score,
         durationMs,
@@ -326,6 +365,19 @@ async function processWithUser(
     uid: user.uid,
   });
   
+  // Get detectiveUsername and avatar from user document
+  let detectiveUsername: string;
+  let avatar: string | null;
+  try {
+    const userDoc = await getUserDoc(user.uid);
+    detectiveUsername = userDoc?.detectiveUsername || user.displayName || user.email || "Kullanıcı";
+    avatar = userDoc?.avatar || null;
+  } catch (error) {
+    console.warn("[leaderboard] Failed to get user doc, using fallback:", error);
+    detectiveUsername = user.displayName || user.email || "Kullanıcı";
+    avatar = null;
+  }
+  
   // CRITICAL: Check if this is the user's first successful attempt for this case
   // We need to check if they already have a leaderboard entry for this case
   // Only the first successful attempt should count for stats and leaderboard
@@ -441,7 +493,7 @@ async function processWithUser(
   try {
     await updateGlobalLeaderboard(
       user.uid,
-      user.displayName || user.email || "Kullanıcı",
+      detectiveUsername, // Use detectiveUsername
       user.photoURL,
       validTotalScore,
       validSolvedCases,
@@ -486,8 +538,9 @@ async function processWithUser(
     if (isFirstSuccessfulAttempt) {
       await updateCaseLeaderboard(
         user.uid,
-        user.displayName || user.email || "Kullanıcı",
+        detectiveUsername, // Use detectiveUsername
         user.photoURL,
+        avatar, // Pass avatar
         caseId,
         score,
         durationMs,

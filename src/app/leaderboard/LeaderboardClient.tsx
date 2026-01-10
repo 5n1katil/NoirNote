@@ -13,6 +13,7 @@ import { cases } from "@/lib/cases";
 import { getText } from "@/lib/text-resolver";
 import { textsTR } from "@/lib/texts.tr";
 import type { LeaderboardEntry } from "@/lib/leaderboard.client";
+import { getAvatarEmoji } from "@/lib/avatars";
 
 function formatDuration(ms: number): string {
   const minutes = Math.floor(ms / (1000 * 60));
@@ -293,12 +294,20 @@ export default function LeaderboardClient() {
                     </td>
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-3">
-                        {entry.photoURL && (
+                        {entry.avatar ? (
+                          <div className="w-8 h-8 rounded-full border border-zinc-700 bg-zinc-900 flex items-center justify-center text-lg">
+                            {getAvatarEmoji(entry.avatar)}
+                          </div>
+                        ) : entry.photoURL ? (
                           <img
                             src={entry.photoURL}
                             alt={entry.displayName}
                             className="w-8 h-8 rounded-full border border-zinc-700"
                           />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full border border-zinc-700 bg-zinc-900 flex items-center justify-center text-xs font-bold">
+                            {(entry.displayName?.[0] || "K").toUpperCase()}
+                          </div>
                         )}
                         <span className="font-semibold text-white">{entry.displayName}</span>
                       </div>
