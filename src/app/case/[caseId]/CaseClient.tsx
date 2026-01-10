@@ -175,8 +175,21 @@ export default function CaseClient({ caseData }: CaseClientProps) {
       // Correct solution
       newStatus = "finished";
       
-      // Calculate score
-      const score = calculateCaseScore(durationMs, newAttempts, caseData.difficulty);
+      // Calculate score (ensure it's a valid number)
+      const calculatedScore = calculateCaseScore(durationMs, newAttempts, caseData.difficulty);
+      // Validate score - must be a finite number
+      const score = (typeof calculatedScore === 'number' && 
+                     !isNaN(calculatedScore) && 
+                     isFinite(calculatedScore) && 
+                     calculatedScore >= 0) ? calculatedScore : 0;
+      
+      console.log("[CaseClient] Case completed successfully:", {
+        caseId: caseData.id,
+        durationMs,
+        attempts: newAttempts,
+        score,
+        difficulty: caseData.difficulty,
+      });
       
       const updated = {
         ...activeCase,

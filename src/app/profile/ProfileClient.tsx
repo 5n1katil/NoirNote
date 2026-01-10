@@ -25,6 +25,7 @@ import {
 } from "firebase/firestore";
 import { getFirebaseClient } from "@/lib/firebase.client";
 import { getUserStats, type UserStats } from "@/lib/userStats.client";
+import { recalculateUserStats } from "@/lib/recalculateStats.client";
 import { getCaseById } from "@/lib/cases";
 import { getText } from "@/lib/text-resolver";
 import { textsTR } from "@/lib/texts.tr";
@@ -62,6 +63,7 @@ export default function ProfileClient() {
   const [caseResults, setCaseResults] = useState<CaseResultWithDetails[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
   const [resultsLoading, setResultsLoading] = useState(true);
+  const [recalculating, setRecalculating] = useState(false);
 
   useEffect(() => {
     const { auth, db } = getFirebaseClient();
@@ -230,6 +232,36 @@ export default function ProfileClient() {
         setCaseResults(loadedResults);
         setResultsLoading(false);
 
+        // If stats are missing OR stats show 0 but user has successful results, recalculate stats
+        const hasSuccessfulResults = loadedResults.some((r) => r.isWin && r.score !== undefined);
+        const needsRecalculation = 
+          (!loadedStats || (loadedStats.totalScore === 0 && loadedStats.solvedCases === 0)) && 
+          hasSuccessfulResults && 
+          !recalculating;
+        
+        if (needsRecalculation && currentUser) {
+          console.log("[ProfileClient] Stats missing or zero but successful results found, recalculating stats...");
+          setRecalculating(true);
+          recalculateUserStats(currentUser.uid)
+            .then((recalculatedStats) => {
+              if (recalculatedStats) {
+                console.log("[ProfileClient] Stats recalculated successfully:", recalculatedStats);
+                setStats(recalculatedStats);
+                // Force reload stats from Firestore to ensure leaderboard is updated
+                loadStats().then((reloadedStats) => {
+                  if (reloadedStats) {
+                    setStats(reloadedStats);
+                  }
+                });
+              }
+              setRecalculating(false);
+            })
+            .catch((error) => {
+              console.error("[ProfileClient] Failed to recalculate stats:", error);
+              setRecalculating(false);
+            });
+        }
+
         // Setup real-time listeners for updates (background, non-blocking)
         // These will sync any changes from other tabs/devices in real-time
         // They don't block the initial render since data is already loaded above
@@ -237,7 +269,29 @@ export default function ProfileClient() {
           statsRef,
           (snap) => {
             if (snap.exists()) {
-              setStats(snap.data() as UserStats);
+              const updatedStats = snap.data() as UserStats;
+              setStats(updatedStats);
+              
+              // If stats show 0 but user has successful results, recalculate
+              if (updatedStats.totalScore === 0 && updatedStats.solvedCases === 0 && loadedResults.length > 0) {
+                const hasSuccessfulResults = loadedResults.some((r) => r.isWin && r.score !== undefined);
+                if (hasSuccessfulResults && !recalculating && currentUser) {
+                  console.log("[ProfileClient] Stats updated to 0 but successful results exist, recalculating...");
+                  setRecalculating(true);
+                  recalculateUserStats(currentUser.uid)
+                    .then((recalculatedStats) => {
+                      if (recalculatedStats) {
+                        console.log("[ProfileClient] Stats recalculated from listener:", recalculatedStats);
+                        setStats(recalculatedStats);
+                      }
+                      setRecalculating(false);
+                    })
+                    .catch((error) => {
+                      console.error("[ProfileClient] Failed to recalculate stats from listener:", error);
+                      setRecalculating(false);
+                    });
+                }
+              }
             } else {
               setStats(null);
             }
