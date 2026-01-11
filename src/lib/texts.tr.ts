@@ -103,7 +103,7 @@ export const textsTR = {
         clue2: "Zehirli içecek servis koridoru üzerinden taşındı.",
         clue3: "Mert merdiven boşluğunu kullanmak zorundaydı.",
         clue4: "Merdiven boşluğunu kullanan kişi ağır bir nesne taşıyordu.",
-        clue5: "Kırık şişe misafir odasına hiç girmedi.",
+        clue5: "Misafir odasında cam kırığına rastlanmadı.",
       },
     },
   },
