@@ -39,11 +39,12 @@ export default function Home() {
       
       <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-col px-4 sm:px-6 pt-0 pb-4 sm:pb-6">
         {/* Language Selector - Top Right */}
-        <div className="flex justify-end mb-5">
-          <div className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 p-1">
+        <div className="flex justify-end mb-0 mt-8 sm:mt-10">
+          <div className="relative z-20 flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 p-1">
             <button
+              type="button"
               onClick={() => setLanguage("tr")}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              className={`cursor-pointer px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
                 language === "tr"
                   ? "bg-white text-black"
                   : "text-white/70 hover:text-white"
@@ -52,8 +53,9 @@ export default function Home() {
               TR
             </button>
             <button
+              type="button"
               onClick={() => setLanguage("en")}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              className={`cursor-pointer px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
                 language === "en"
                   ? "bg-white text-black"
                   : "text-white/70 hover:text-white"
