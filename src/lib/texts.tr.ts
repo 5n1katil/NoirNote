@@ -255,6 +255,13 @@ export const textsTR = {
     usernameMaxLength: "Kullanıcı adı en fazla 20 karakter olmalı",
     usernameInvalid: "Kullanıcı adı sadece harf, rakam ve alt çizgi içerebilir",
     avatarLabel: "Avatar Seçimi",
+    bio: "Biyografi",
+    bioPlaceholder: "Kendinizi tanıtın (maksimum 200 kelime)...",
+    bioMaxLength: "Biyografi en fazla 200 kelime olabilir",
+    bioEmpty: "Henüz biyografi yazılmamış",
+    viewProfile: "Profili Görüntüle",
+    userNotFound: "Kullanıcı bulunamadı",
+    viewingOtherProfile: "Başka Bir Oyuncunun Profili",
   },
   profileSetup: {
     title: "Profil Oluştur",

@@ -61,7 +61,7 @@ export default function ProfileClient() {
   // Get user immediately from auth.currentUser (optimistic)
   const { auth } = getFirebaseClient();
   const [user, setUser] = useState<User | null>(auth.currentUser);
-  const [userDoc, setUserDoc] = useState<{ detectiveUsername: string | null; avatar: string | null } | null>(null);
+  const [userDoc, setUserDoc] = useState<{ detectiveUsername: string | null; avatar: string | null; bio: string | null } | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [caseResults, setCaseResults] = useState<CaseResultWithDetails[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
@@ -70,6 +70,7 @@ export default function ProfileClient() {
   const [isEditing, setIsEditing] = useState(false);
   const [editUsername, setEditUsername] = useState("");
   const [editAvatar, setEditAvatar] = useState<string>(AVATAR_OPTIONS[0].id);
+  const [editBio, setEditBio] = useState("");
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<"all" | "win" | "loss">("win"); // Default: show successful cases
@@ -88,9 +89,10 @@ export default function ProfileClient() {
       getUserDoc(currentUser.uid)
         .then((doc) => {
           if (doc) {
-            setUserDoc({ detectiveUsername: doc.detectiveUsername, avatar: doc.avatar });
+            setUserDoc({ detectiveUsername: doc.detectiveUsername, avatar: doc.avatar, bio: doc.bio });
             setEditUsername(doc.detectiveUsername || "");
             setEditAvatar(doc.avatar || AVATAR_OPTIONS[0].id);
+            setEditBio(doc.bio || "");
           }
         })
         .catch((err) => console.error("[ProfileClient] Error loading user doc:", err));
@@ -102,9 +104,10 @@ export default function ProfileClient() {
         (snap) => {
           if (snap.exists()) {
             const userData = snap.data() as FirestoreUserDoc;
-            setUserDoc({ detectiveUsername: userData.detectiveUsername, avatar: userData.avatar });
+            setUserDoc({ detectiveUsername: userData.detectiveUsername, avatar: userData.avatar, bio: userData.bio });
             setEditUsername(userData.detectiveUsername || "");
             setEditAvatar(userData.avatar || AVATAR_OPTIONS[0].id);
+            setEditBio(userData.bio || "");
           }
         },
         (error) => {
@@ -422,16 +425,27 @@ export default function ProfileClient() {
       return;
     }
 
-    // Only save avatar, username is not editable
+    // Validate bio
+    const bioError = validateBio(editBio);
+    if (bioError) {
+      setEditError(bioError);
+      return;
+    }
+
     setSaving(true);
 
     try {
       await updateUserDoc(user.uid, {
         avatar: editAvatar,
+        bio: editBio.trim() || null,
         // detectiveUsername is not updated - it's read-only
       });
 
-      setUserDoc({ detectiveUsername: userDoc?.detectiveUsername || null, avatar: editAvatar });
+      setUserDoc({ 
+        detectiveUsername: userDoc?.detectiveUsername || null, 
+        avatar: editAvatar,
+        bio: editBio.trim() || null
+      });
       setIsEditing(false);
       setEditError(null);
     } catch (err: any) {
@@ -447,6 +461,7 @@ export default function ProfileClient() {
     setEditError(null);
     setEditUsername(userDoc?.detectiveUsername || "");
     setEditAvatar(userDoc?.avatar || AVATAR_OPTIONS[0].id);
+    setEditBio(userDoc?.bio || "");
   }
 
   // Only use detectiveUsername from profile setup, fallback to email if not set
@@ -492,6 +507,20 @@ export default function ProfileClient() {
           )}
         </div>
 
+        {/* Bio Section - Show when not editing */}
+        {!isEditing && (
+          <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-zinc-800">
+            <h3 className="text-sm font-semibold text-zinc-300 mb-2">{textsTR.profile.bio}</h3>
+            {userDoc?.bio ? (
+              <p className="text-sm sm:text-base text-zinc-300 whitespace-pre-wrap break-words">
+                {userDoc.bio}
+              </p>
+            ) : (
+              <p className="text-sm text-zinc-500 italic">{textsTR.profile.bioEmpty}</p>
+            )}
+          </div>
+        )}
+
         {isEditing && (
           <form onSubmit={handleSaveProfile} className="space-y-6 border-t border-zinc-800 pt-6">
             <div>
@@ -531,6 +560,30 @@ export default function ProfileClient() {
                     <span className="text-2xl">{avatar.emoji}</span>
                   </button>
                 ))}
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="edit-bio" className="block text-sm font-semibold text-zinc-300 mb-2">
+                {textsTR.profile.bio}
+              </label>
+              <textarea
+                id="edit-bio"
+                value={editBio}
+                onChange={(e) => setEditBio(e.target.value)}
+                placeholder={textsTR.profile.bioPlaceholder}
+                rows={6}
+                maxLength={2000}
+                disabled={saving}
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-zinc-700 resize-y disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              <div className="mt-2 flex items-center justify-between">
+                <p className="text-xs text-zinc-500">
+                  {countWords(editBio)} / 200 {textsTR.profile.bioMaxLength.includes("kelime") ? "kelime" : "words"}
+                </p>
+                {validateBio(editBio) && (
+                  <p className="text-xs text-red-400">{validateBio(editBio)}</p>
+                )}
               </div>
             </div>
 

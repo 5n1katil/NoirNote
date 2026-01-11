@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { collection, query, orderBy, limit, onSnapshot, getDocs, getDocsFromCache } from "firebase/firestore";
 import { getFirebaseClient } from "@/lib/firebase.client";
 import { cases } from "@/lib/cases";
@@ -295,7 +296,11 @@ export default function LeaderboardClient() {
                       </div>
                     </td>
                     <td className="py-2 sm:py-3 px-2 sm:px-4">
-                      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                      <Link
+                        href={`/profile/${entry.uid}`}
+                        className="flex items-center gap-2 sm:gap-3 min-w-0 hover:opacity-80 transition-opacity cursor-pointer"
+                        title={textsTR.profile.viewProfile}
+                      >
                         {entry.avatar ? (
                           <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full border border-zinc-700 bg-zinc-900 flex items-center justify-center text-sm sm:text-lg flex-shrink-0">
                             {getAvatarEmoji(entry.avatar)}
@@ -312,7 +317,7 @@ export default function LeaderboardClient() {
                           </div>
                         )}
                         <span className="font-semibold text-white text-xs sm:text-sm truncate">{entry.displayName}</span>
-                      </div>
+                      </Link>
                     </td>
                     <td className="py-2 sm:py-3 px-2 sm:px-4 text-right">
                       <span className="font-bold text-yellow-400 text-sm sm:text-base">

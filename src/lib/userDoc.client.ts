@@ -9,6 +9,7 @@ export type FirestoreUserDoc = {
   photoURL: string | null;
   detectiveUsername: string | null;
   avatar: string | null;
+  bio: string | null; // User profile bio (max 200 words)
   profileSetupCompleted: boolean;
   createdAt: unknown; // serverTimestamp placeholder
 };
@@ -31,6 +32,7 @@ export async function ensureUserDoc(user: User): Promise<void> {
     photoURL: user.photoURL ?? null,
     detectiveUsername: null,
     avatar: null,
+    bio: null,
     profileSetupCompleted: false,
     createdAt: serverTimestamp(),
   };
