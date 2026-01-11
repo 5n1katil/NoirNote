@@ -67,10 +67,10 @@ export default function Home() {
         </div>
 
         {/* Hero Section - Split 50/50, Image Left, Title & Slogan Right */}
-        <div className="flex flex-col lg:flex-row items-center lg:items-center gap-4 sm:gap-6 lg:gap-8 mb-4 sm:mb-4 lg:-mb-6 -mt-24 sm:-mt-24 lg:-mt-24">
+        <div className="flex flex-col lg:flex-row items-center lg:items-center gap-4 sm:gap-6 lg:gap-8 mb-6 sm:mb-4 lg:-mb-6 mt-0 sm:-mt-24 lg:-mt-24">
           {/* Logo and Mascot Image - Left Side (50%) */}
           <div className="w-full lg:w-1/2 flex items-center justify-center">
-            <div className="w-56 h-56 sm:w-64 sm:h-64 lg:w-96 lg:h-96 xl:w-[28rem] xl:h-[28rem] relative">
+            <div className="w-72 h-72 sm:w-64 sm:h-64 lg:w-96 lg:h-96 xl:w-[28rem] xl:h-[28rem] relative">
               <Image
                 src="/logo-mascot.png"
                 alt={textsTR.a11y.appLogoAlt}
@@ -87,10 +87,10 @@ export default function Home() {
             <h1 className="text-5xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-black tracking-tight mb-2 sm:mb-3 bg-gradient-to-r from-white via-white to-zinc-400 bg-clip-text text-transparent">
               {texts.title}
             </h1>
-            <p className="text-lg sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-zinc-300 tracking-wide mb-1 px-2 sm:px-0">
+            <p className="text-xl sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-zinc-300 tracking-wide mb-1 px-2 sm:px-0">
               {texts.mainSlogan}
             </p>
-            <p className="text-sm sm:text-sm md:text-base lg:text-lg text-zinc-500 font-medium px-2 sm:px-0">
+            <p className="text-base sm:text-sm md:text-base lg:text-lg text-zinc-500 font-medium px-2 sm:px-0">
               {texts.mainSloganEn}
             </p>
           </div>
@@ -100,7 +100,7 @@ export default function Home() {
         <div className="w-full max-w-4xl mx-auto px-2 sm:px-0">
           {/* Description */}
           <div className="mb-6 sm:mb-6 lg:mb-8">
-            <div className="space-y-2 sm:space-y-3 text-sm sm:text-sm md:text-base lg:text-lg text-zinc-300 leading-relaxed text-center">
+            <div className="space-y-2 sm:space-y-3 text-base sm:text-sm md:text-base lg:text-lg text-zinc-300 leading-relaxed text-center">
               {texts.description.split('\n').map((paragraph, index) => (
                 <p key={index} className={index === 0 ? "font-semibold text-white" : ""}>
                   {paragraph}
