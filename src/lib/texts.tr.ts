@@ -99,7 +99,7 @@ export const textsTR = {
       briefing:
         "Lüks otelin 5. katında bir oda hizmetçisi ceset buldu. Kurban, odasında ölü bulundu ve birkaç değerli eşya eksikti. Kapı zorla açılmıştı. Kurbanın cep telefonu kayıp ve henüz bulunamadı.",
       clues: {
-        clue1: "Deniz sadece hafif bir silah taşıyabildi.",
+        clue1: "Deniz sadece hafif bir silah taşıyabilirdi.",
         clue2: "Zehirli içecek servis koridoru üzerinden taşındı.",
         clue3: "Mert merdiven boşluğunu kullanmak zorundaydı.",
         clue4: "Merdiven boşluğunu kullanan kişi ağır bir nesne taşıyordu.",
