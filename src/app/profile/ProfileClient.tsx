@@ -416,6 +416,18 @@ export default function ProfileClient() {
     return null;
   }
 
+  function countWords(text: string): number {
+    return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+  }
+
+  function validateBio(value: string): string | null {
+    const wordCount = countWords(value);
+    if (wordCount > 200) {
+      return textsTR.profile.bioMaxLength;
+    }
+    return null;
+  }
+
   async function handleSaveProfile(e: React.FormEvent) {
     e.preventDefault();
     setEditError(null);
