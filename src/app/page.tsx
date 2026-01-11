@@ -37,7 +37,7 @@ export default function Home() {
       <div className="absolute inset-0 bg-gradient-to-br from-zinc-950 via-black to-zinc-900" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.03),transparent_70%)]" />
       
-      <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-col px-4 sm:px-6 pt-2 sm:pt-3 pb-4 sm:pb-6">
+      <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-col px-4 sm:px-6 pt-0 sm:pt-1 pb-4 sm:pb-6">
         {/* Language Selector - Top Right */}
         <div className="flex justify-end mb-2 sm:mb-3">
           <div className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 p-1">
@@ -65,7 +65,7 @@ export default function Home() {
         </div>
 
         {/* Hero Section - Split 50/50, Image Left, Title & Slogan Right */}
-        <div className="flex flex-col lg:flex-row items-center lg:items-center gap-6 sm:gap-8 lg:gap-12 mb-5 sm:mb-6">
+        <div className="flex flex-col lg:flex-row items-center lg:items-center gap-6 sm:gap-8 lg:gap-12 mb-3 sm:mb-4">
           {/* Logo and Mascot Image - Left Side (50%) */}
           <div className="w-full lg:w-1/2 flex items-center justify-center">
             <div className="w-64 h-64 sm:w-80 sm:h-80 lg:w-96 lg:h-96 xl:w-[28rem] xl:h-[28rem] relative">
@@ -98,7 +98,7 @@ export default function Home() {
         <div className="w-full max-w-4xl mx-auto">
           {/* Description */}
           <div className="mb-4 sm:mb-5">
-            <div className="space-y-2 sm:space-y-3 text-base sm:text-lg text-zinc-300 leading-relaxed text-center lg:text-left">
+            <div className="space-y-2 sm:space-y-3 text-sm sm:text-base lg:text-lg text-zinc-300 leading-relaxed text-center">
               {texts.description.split('\n').map((paragraph, index) => (
                 <p key={index} className={index === 0 ? "font-semibold text-white" : ""}>
                   {paragraph}
@@ -126,7 +126,7 @@ export default function Home() {
         </div>
 
         {/* Footer decoration */}
-        <div className="mt-6 sm:mt-8 text-center">
+        <div className="mt-8 sm:mt-10 text-center">
           <p className="text-sm sm:text-base text-zinc-600 font-medium">
             5N 1Dedektif
           </p>
