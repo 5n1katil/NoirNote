@@ -31,8 +31,8 @@ service cloud.firestore {
 
     match /results/{resultId} {
       // Document ID format: {uid}_{caseId}
-      allow read: if request.auth != null && 
-        (resource == null || resource.data.uid == request.auth.uid);
+      // Allow authenticated users to read any result (for public profiles)
+      allow read: if request.auth != null;
       allow write: if request.auth != null && 
         request.resource.data.uid == request.auth.uid;
     }

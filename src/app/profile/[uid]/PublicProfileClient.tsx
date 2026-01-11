@@ -65,6 +65,9 @@ export default function PublicProfileClient({ targetUid }: PublicProfileClientPr
   const [filterType, setFilterType] = useState<"all" | "win" | "loss">("win");
 
   useEffect(() => {
+    let unsubscribeResults: (() => void) | null = null;
+    let unsubscribeUserDoc: (() => void) | null = null;
+    
     const unsubscribeAuth = onAuthStateChanged(auth, (user: User | null) => {
       setCurrentUser(user);
     });
@@ -113,7 +116,7 @@ export default function PublicProfileClient({ targetUid }: PublicProfileClientPr
         }
 
         // Setup real-time listener for case results
-        const unsubscribeResults = onSnapshot(
+        unsubscribeResults = onSnapshot(
           resultsQuery,
           (snapshot) => {
             const results: CaseResultWithDetails[] = [];
@@ -135,7 +138,7 @@ export default function PublicProfileClient({ targetUid }: PublicProfileClientPr
 
         // Setup real-time listener for user document
         const userDocRef = doc(db, "users", targetUid);
-        const unsubscribeUserDoc = onSnapshot(
+        unsubscribeUserDoc = onSnapshot(
           userDocRef,
           (snap) => {
             if (snap.exists()) {
@@ -148,11 +151,6 @@ export default function PublicProfileClient({ targetUid }: PublicProfileClientPr
         );
 
         setLoading(false);
-
-        return () => {
-          unsubscribeResults();
-          unsubscribeUserDoc();
-        };
       } catch (err: any) {
         console.error("[PublicProfileClient] Error loading user data:", err);
         setError(err?.message || "Kullanıcı verileri yüklenirken bir hata oluştu.");
@@ -164,6 +162,8 @@ export default function PublicProfileClient({ targetUid }: PublicProfileClientPr
 
     return () => {
       unsubscribeAuth();
+      if (unsubscribeResults) unsubscribeResults();
+      if (unsubscribeUserDoc) unsubscribeUserDoc();
     };
   }, [targetUid, auth, db]);
 
@@ -219,9 +219,6 @@ export default function PublicProfileClient({ targetUid }: PublicProfileClientPr
             <h1 className="text-xl sm:text-2xl font-bold text-white mb-1 break-words">
               {targetUserDoc.detectiveUsername || targetUserDoc.displayName || "Kullanıcı"}
             </h1>
-            {targetUserDoc.email && (
-              <p className="text-sm text-zinc-400 mb-2 break-words">{targetUserDoc.email}</p>
-            )}
           </div>
         </div>
 
