@@ -80,10 +80,10 @@ export function AuthedShell({ title, children }: AuthedShellProps) {
           style={{
             maxWidth: 1200,
             margin: "0 auto",
-            padding: "12px 16px",
+            padding: "14px 16px",
             display: "flex",
             alignItems: "center",
-            gap: 12,
+            gap: 14,
             flexWrap: "wrap",
           }}
         >
@@ -100,9 +100,9 @@ export function AuthedShell({ title, children }: AuthedShellProps) {
           >
             <div
               style={{
-                width: 40,
-                height: 40,
-                borderRadius: 10,
+                width: 56,
+                height: 56,
+                borderRadius: 12,
                 overflow: "hidden",
                 flexShrink: 0,
                 display: "flex",
@@ -115,8 +115,8 @@ export function AuthedShell({ title, children }: AuthedShellProps) {
               <Image
                 src="/logo.png"
                 alt={textsTR.a11y.appLogoAlt}
-                width={40}
-                height={40}
+                width={56}
+                height={56}
                 priority
                 style={{
                   width: "100%",
@@ -125,9 +125,9 @@ export function AuthedShell({ title, children }: AuthedShellProps) {
                 }}
               />
             </div>
-            <div className="hidden sm:block" style={{ lineHeight: 1.2 }}>
-              <div style={{ fontWeight: 900, fontSize: 16 }}>NoirNote</div>
-              <div style={{ fontSize: 10, opacity: 0.7, letterSpacing: "0.5px" }}>5N 1Dedektif</div>
+            <div style={{ lineHeight: 1.2 }}>
+              <div className="text-lg sm:text-2xl" style={{ fontWeight: 900, display: "block" }}>NoirNote</div>
+              <div className="hidden sm:block text-xs sm:text-sm" style={{ opacity: 0.7, letterSpacing: "0.5px" }}>5N 1Dedektif</div>
             </div>
           </Link>
 
@@ -142,8 +142,8 @@ export function AuthedShell({ title, children }: AuthedShellProps) {
                     textDecoration: "none",
                     color: active ? "white" : "rgba(255,255,255,0.7)",
                     fontWeight: 700,
-                    fontSize: 13,
-                    padding: "6px 10px",
+                    fontSize: 15,
+                    padding: "8px 14px",
                     borderRadius: 8,
                     background: active ? "rgba(255,255,255,0.08)" : "transparent",
                     whiteSpace: "nowrap",
