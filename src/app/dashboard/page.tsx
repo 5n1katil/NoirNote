@@ -24,8 +24,8 @@ export default function DashboardPage() {
       <AuthedShell title={textsTR.dashboard.title}>
         <div className="space-y-4 sm:space-y-6">
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-2 sm:gap-3">
-              <span className="text-2xl sm:text-3xl">📋</span>
+            <h2 className="text-2xl sm:text-2xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-2 sm:gap-3">
+              <span className="text-3xl sm:text-3xl">📋</span>
               {textsTR.cases.list.title}
             </h2>
             <div className="grid gap-4 sm:gap-5 md:grid-cols-2">
@@ -37,11 +37,11 @@ export default function DashboardPage() {
                   <div className="flex flex-col gap-3 sm:gap-4">
                     <div className="flex items-start justify-between gap-3 sm:gap-4">
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-lg sm:text-xl font-bold text-white mb-2 sm:mb-3 group-hover:text-white transition-colors break-words">
+                        <h3 className="text-xl sm:text-xl font-bold text-white mb-2 sm:mb-3 group-hover:text-white transition-colors break-words">
                           {getText(caseItem.titleKey)}
                         </h3>
                         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                          <span className={`inline-flex items-center gap-1.5 px-2 sm:px-3 py-1 rounded-full text-xs font-semibold border ${getDifficultyColor(caseItem.difficulty)}`}>
+                          <span className={`inline-flex items-center gap-1.5 px-2 sm:px-3 py-1 rounded-full text-sm font-semibold border ${getDifficultyColor(caseItem.difficulty)}`}>
                             <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
                             {textsTR.difficulty[caseItem.difficulty]}
                           </span>
@@ -49,12 +49,12 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2 border-t border-zinc-800">
-                      <div className="text-xs text-zinc-500 break-words">
+                      <div className="text-sm text-zinc-500 break-words">
                         {caseItem.suspects.length} şüpheli • {caseItem.locations.length} konum • {caseItem.weapons.length} silah
                       </div>
                       <Link
                         href={`/case/${caseItem.id}`}
-                        className="w-full sm:w-auto inline-flex items-center justify-center rounded-lg bg-white text-black px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold hover:bg-zinc-200 active:scale-95 transition-all duration-200 shadow-lg shadow-black/20"
+                        className="w-full sm:w-auto inline-flex items-center justify-center rounded-lg bg-white text-black px-4 sm:px-5 py-2 sm:py-2.5 text-sm sm:text-sm font-semibold hover:bg-zinc-200 active:scale-95 transition-all duration-200 shadow-lg shadow-black/20"
                       >
                         {textsTR.cases.list.startButton}
                         <span className="ml-2">→</span>

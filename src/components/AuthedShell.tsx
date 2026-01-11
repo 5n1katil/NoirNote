@@ -99,9 +99,8 @@ export function AuthedShell({ title, children }: AuthedShellProps) {
             }}
           >
             <div
+              className="w-14 h-14 sm:w-14 sm:h-14"
               style={{
-                width: 56,
-                height: 56,
                 borderRadius: 12,
                 overflow: "hidden",
                 flexShrink: 0,
@@ -126,7 +125,7 @@ export function AuthedShell({ title, children }: AuthedShellProps) {
               />
             </div>
             <div style={{ lineHeight: 1.2 }}>
-              <div className="text-lg sm:text-2xl" style={{ fontWeight: 900, display: "block" }}>NoirNote</div>
+              <div className="text-2xl sm:text-2xl" style={{ fontWeight: 900, display: "block" }}>NoirNote</div>
               <div className="hidden sm:block text-xs sm:text-sm" style={{ opacity: 0.7, letterSpacing: "0.5px" }}>5N 1Dedektif</div>
             </div>
           </Link>
@@ -189,7 +188,6 @@ export function AuthedShell({ title, children }: AuthedShellProps) {
                 )}
               </div>
               <div
-                className="hidden sm:block"
                 style={{
                   fontSize: 13,
                   fontWeight: 800,
@@ -226,7 +224,7 @@ export function AuthedShell({ title, children }: AuthedShellProps) {
       </header>
 
       <main className="max-w-[1200px] mx-auto px-4 sm:px-6 py-4 sm:py-7" style={{ color: "white" }}>
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-black m-0">{title}</h1>
+        <h1 className="text-3xl sm:text-3xl md:text-4xl font-black m-0">{title}</h1>
         <div className="mt-3 sm:mt-4">{children}</div>
       </main>
     </div>
