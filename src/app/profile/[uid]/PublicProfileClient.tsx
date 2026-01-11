@@ -129,10 +129,12 @@ export default function PublicProfileClient({ targetUid }: PublicProfileClientPr
               });
             });
             results.sort((a, b) => b.finishedAt - a.finishedAt);
+            console.log("[PublicProfileClient] Case results loaded:", results.length, "results for user", targetUid);
             setCaseResults(results);
           },
           (error) => {
             console.error("[PublicProfileClient] Results listener error:", error);
+            console.error("[PublicProfileClient] Error code:", error?.code, "Error message:", error?.message);
           }
         );
 
