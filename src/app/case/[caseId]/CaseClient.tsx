@@ -440,7 +440,7 @@ export default function CaseClient({ caseData }: CaseClientProps) {
         <button
           onClick={onSubmitReport}
           disabled={!allSelected || isSubmitting || isModalOpen || activeCase.status === "finished"}
-          className={`w-full rounded-lg px-6 py-4 font-bold text-base transition-all duration-200 shadow-lg ${
+          className={`w-full rounded-lg px-4 sm:px-6 py-3 sm:py-4 font-bold text-sm sm:text-base transition-all duration-200 shadow-lg ${
             allSelected && !isSubmitting && !isModalOpen && activeCase.status !== "finished"
               ? "bg-white text-black hover:bg-zinc-200 hover:shadow-xl hover:shadow-white/10 active:scale-[0.98]"
               : "bg-zinc-800 text-zinc-500 cursor-not-allowed shadow-black/20"

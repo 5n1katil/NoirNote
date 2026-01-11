@@ -72,6 +72,7 @@ export default function ProfileClient() {
   const [editAvatar, setEditAvatar] = useState<string>(AVATAR_OPTIONS[0].id);
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [filterType, setFilterType] = useState<"all" | "win" | "loss">("win"); // Default: show successful cases
 
   useEffect(() => {
     const { auth, db } = getFirebaseClient();
@@ -453,6 +454,13 @@ export default function ProfileClient() {
   const displayUsername = userDoc?.detectiveUsername || user?.email || "Kullanıcı";
   const displayAvatar = userDoc?.avatar;
 
+  // Filter case results based on selected filter
+  const filteredResults = caseResults.filter((result) => {
+    if (filterType === "win") return result.isWin;
+    if (filterType === "loss") return !result.isWin;
+    return true; // "all"
+  });
+
   return (
     <div className="space-y-6">
       {/* User Info */}
@@ -594,27 +602,40 @@ export default function ProfileClient() {
 
       {/* Case Results */}
       <div className="rounded-xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 p-4 sm:p-6 shadow-lg shadow-black/20">
-        <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-          <span className="text-2xl">🏆</span>
-          {textsTR.profile.caseResults}
-        </h2>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <span className="text-2xl">🏆</span>
+            {textsTR.profile.caseResults}
+          </h2>
+          {caseResults.length > 0 && (
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value as "all" | "win" | "loss")}
+              className="rounded-lg border border-zinc-700 bg-zinc-950 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-white/20 transition-colors"
+            >
+              <option value="win">{textsTR.profile.filterWins}</option>
+              <option value="loss">{textsTR.profile.filterLosses}</option>
+              <option value="all">{textsTR.profile.filterAll}</option>
+            </select>
+          )}
+        </div>
         {resultsLoading ? (
           <div className="text-center py-8 text-zinc-400">
             <div className="inline-block animate-pulse">{textsTR.common.loading}</div>
           </div>
-        ) : caseResults.length > 0 ? (
-          <div className="space-y-3">
-            {caseResults.map((result, index) => (
+        ) : filteredResults.length > 0 ? (
+          <div className="space-y-2">
+            {filteredResults.map((result, index) => (
               <div
                 key={`${result.uid}_${result.caseId}_${result.finishedAt}_${index}`}
-                className={`rounded-lg border p-4 hover:border-zinc-700 transition-colors ${
+                className={`rounded-lg border p-3 sm:p-4 hover:border-zinc-700 transition-colors ${
                   result.isWin 
                     ? "border-zinc-800 bg-zinc-950/50" 
                     : "border-zinc-800/50 bg-zinc-950/30 opacity-75"
                 }`}
               >
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 sm:gap-4">
-                  <div className="col-span-2 sm:col-span-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
+                  <div className="sm:col-span-2">
                     <div className="text-xs text-zinc-500 mb-1">{textsTR.profile.case}</div>
                     <div className="font-semibold text-white text-sm sm:text-base break-words">{result.caseTitle}</div>
                   </div>
@@ -644,13 +665,17 @@ export default function ProfileClient() {
                     <div className="text-xs text-zinc-500 mb-1">{textsTR.profile.attempts}</div>
                     <div className="font-semibold text-white text-sm sm:text-base">{result.attempts}</div>
                   </div>
-                  <div className="col-span-2 sm:col-span-1">
+                  <div className="sm:col-span-2 md:col-span-1 lg:col-span-1">
                     <div className="text-xs text-zinc-500 mb-1">{textsTR.profile.completedAt}</div>
                     <div className="font-semibold text-white text-xs sm:text-sm">{formatDate(result.finishedAt)}</div>
                   </div>
                 </div>
               </div>
             ))}
+          </div>
+        ) : caseResults.length > 0 ? (
+          <div className="text-center py-8 text-zinc-400">
+            Seçilen filtreye uygun sonuç bulunamadı.
           </div>
         ) : (
           <div className="text-center py-8 text-zinc-400">
