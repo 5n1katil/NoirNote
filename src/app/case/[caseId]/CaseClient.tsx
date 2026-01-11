@@ -319,29 +319,29 @@ export default function CaseClient({ caseData }: CaseClientProps) {
           <div className="space-y-4 sm:space-y-6">
             {/* Briefing */}
             <div className="rounded-xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 p-4 sm:p-6 shadow-lg shadow-black/20">
-              <h2 className="text-lg sm:text-xl font-bold text-white mb-3 sm:mb-4 flex items-center gap-2">
-                <span className="text-xl sm:text-2xl">📄</span>
+              <h2 className="text-xl sm:text-xl font-bold text-white mb-3 sm:mb-4 flex items-center gap-2">
+                <span className="text-2xl sm:text-2xl">📄</span>
                 {textsTR.cases.briefing}
               </h2>
-              <div className="rounded-lg border border-zinc-800 bg-zinc-950/50 p-5 text-sm text-zinc-300 leading-relaxed">
+              <div className="rounded-lg border border-zinc-800 bg-zinc-950/50 p-5 text-base sm:text-sm text-zinc-300 leading-relaxed">
                 {getText(caseData.briefingKey)}
               </div>
             </div>
 
             {/* Clues */}
             <div className="rounded-xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 p-4 sm:p-6 shadow-lg shadow-black/20">
-              <h2 className="text-lg sm:text-xl font-bold text-white mb-3 sm:mb-4 flex items-center gap-2">
-                <span className="text-xl sm:text-2xl">🔍</span>
+              <h2 className="text-xl sm:text-xl font-bold text-white mb-3 sm:mb-4 flex items-center gap-2">
+                <span className="text-2xl sm:text-2xl">🔍</span>
                 {textsTR.cases.clues}
               </h2>
               <ul className="space-y-3">
                 {caseData.clues.map((clueKey, index) => (
                   <li
                     key={index}
-                    className="group rounded-lg border border-zinc-800 bg-zinc-950/50 p-3 sm:p-4 text-xs sm:text-sm text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900/50 transition-all duration-200"
+                    className="group rounded-lg border border-zinc-800 bg-zinc-950/50 p-4 sm:p-4 text-base sm:text-sm text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900/50 transition-all duration-200"
                   >
                     <div className="flex items-start gap-3">
-                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-zinc-800 text-zinc-500 flex items-center justify-center text-xs font-bold mt-0.5 group-hover:bg-zinc-700 group-hover:text-white transition-colors">
+                      <span className="flex-shrink-0 w-7 h-7 sm:w-6 sm:h-6 rounded-full bg-zinc-800 text-zinc-500 flex items-center justify-center text-sm sm:text-xs font-bold mt-0.5 group-hover:bg-zinc-700 group-hover:text-white transition-colors">
                         {index + 1}
                       </span>
                       <span className="flex-1">{getText(clueKey)}</span>

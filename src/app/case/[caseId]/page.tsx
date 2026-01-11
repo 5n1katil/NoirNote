@@ -28,16 +28,16 @@ export default async function CasePage({ params }: CasePageProps) {
             <div className="flex items-center gap-3 mb-4">
               <Link
                 href="/dashboard"
-                className="text-sm text-zinc-400 hover:text-white transition-colors"
+                className="text-base sm:text-sm text-zinc-400 hover:text-white transition-colors"
               >
                 ← {textsTR.common.back}
               </Link>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xs font-medium text-zinc-400">
+              <span className="text-sm sm:text-xs font-medium text-zinc-400">
                 {textsTR.difficulty.label}
               </span>
-              <span className="text-sm font-medium text-zinc-300">
+              <span className="text-base sm:text-sm font-medium text-zinc-300">
                 {textsTR.difficulty[caseData.difficulty]}
               </span>
             </div>
