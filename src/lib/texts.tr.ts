@@ -159,7 +159,7 @@ export const textsTR = {
     desc003: "Düşük sesli elektrikli matkap. Duvar delmek veya kilit mekanizmalarını aşmak için kullanılabilir.",
   },
   grid: {
-    title: "İnceleme Tablosu",
+    title: "Dedektif Not Defteri",
     suspects: "KİM",
     locations: "NEREDE",
     weapons: "NEYLE",
