@@ -33,7 +33,7 @@ export const textsTR = {
     mainSlogan: "Kanıt yoksa suç da yoktur.",
     mainSloganEn: "Mark it. Prove it.",
     primaryCta: "Giriş yap",
-    secondaryCta: "Gösterge paneline git",
+    secondaryCta: "Vaka paneline git",
     primaryCtaEn: "Sign In",
     secondaryCtaEn: "Go to Dashboard",
   },
