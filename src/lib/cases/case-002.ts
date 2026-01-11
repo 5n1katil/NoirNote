@@ -77,7 +77,6 @@ export const case002: Case = {
     "cases.case002.clues.clue3",
     "cases.case002.clues.clue4",
     "cases.case002.clues.clue5",
-    "cases.case002.clues.clue6",
   ],
   solution: {
     suspectId: "suspect-009", // Selin Vural
