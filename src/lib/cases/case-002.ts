@@ -80,7 +80,7 @@ export const case002: Case = {
   ],
   solution: {
     suspectId: "suspect-009", // Selin Vural
-    locationId: "location-007", // Kurbanın Odası (504)
-    weaponId: "weapon-009", // Zehirli İçecek
+    locationId: "location-007", // Guest Room
+    weaponId: "weapon-007", // Broken Bottle
   },
 };
