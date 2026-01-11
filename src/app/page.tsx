@@ -65,7 +65,7 @@ export default function Home() {
         </div>
 
         {/* Hero Section - Split 50/50, Image Left, Title & Slogan Right */}
-        <div className="flex flex-col lg:flex-row items-center lg:items-center gap-4 sm:gap-6 lg:gap-8 mb-1 sm:mb-2 -mt-24 sm:-mt-16">
+        <div className="flex flex-col lg:flex-row items-center lg:items-center gap-4 sm:gap-6 lg:gap-8 mb-8 sm:mb-4 -mt-24 sm:-mt-16">
           {/* Logo and Mascot Image - Left Side (50%) */}
           <div className="w-full lg:w-1/2 flex items-center justify-center">
             <div className="w-64 h-64 sm:w-80 sm:h-80 lg:w-96 lg:h-96 xl:w-[28rem] xl:h-[28rem] relative">
