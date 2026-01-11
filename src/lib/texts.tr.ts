@@ -52,6 +52,7 @@ export const textsTR = {
     redirecting: "Yönlendiriliyorsun…",
     toggleToSignUp: "Hesabın yok mu? Kayıt ol",
     toggleToSignIn: "Zaten hesabın var mı? Giriş yap",
+    backToHome: "Ana Sayfaya Dön",
     emailRequired: "E-posta adresi gerekli",
     passwordRequired: "Şifre gerekli",
     passwordMinLength: "Şifre en az 6 karakter olmalı",
