@@ -37,9 +37,9 @@ export default function Home() {
       <div className="absolute inset-0 bg-gradient-to-br from-zinc-950 via-black to-zinc-900" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.03),transparent_70%)]" />
       
-      <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-col px-4 sm:px-6 pt-0 sm:pt-1 pb-4 sm:pb-6">
+      <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-col px-4 sm:px-6 pt-0 pb-4 sm:pb-6">
         {/* Language Selector - Top Right */}
-        <div className="flex justify-end mb-0 sm:mb-1">
+        <div className="flex justify-end mb-0">
           <div className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 p-1">
             <button
               onClick={() => setLanguage("tr")}
@@ -65,7 +65,7 @@ export default function Home() {
         </div>
 
         {/* Hero Section - Split 50/50, Image Left, Title & Slogan Right */}
-        <div className="flex flex-col lg:flex-row items-center lg:items-center gap-4 sm:gap-6 lg:gap-8 mb-3 sm:mb-4">
+        <div className="flex flex-col lg:flex-row items-center lg:items-center gap-4 sm:gap-6 lg:gap-8 mb-3 sm:mb-4 -mt-2 sm:-mt-1">
           {/* Logo and Mascot Image - Left Side (50%) */}
           <div className="w-full lg:w-1/2 flex items-center justify-center">
             <div className="w-64 h-64 sm:w-80 sm:h-80 lg:w-96 lg:h-96 xl:w-[28rem] xl:h-[28rem] relative">
